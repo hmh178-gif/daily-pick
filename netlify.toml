@@ -1,0 +1,17 @@
+# Netlify 설정
+# - 정적 페이지는 public/ 에서 서빙
+# - 서버리스 함수는 netlify/functions/ 에서 로드
+# - 브라우저의 /api/* 요청을 함수로 rewrite(내부 프록시)
+
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[build.environment]
+  # 전역 fetch 사용을 위해 Node 18 이상
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200

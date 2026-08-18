@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>오늘 하루, 어디서 뭐 할까?</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+<style>
+:root{
+  --sky:#EAF6FB; --sea:#0E4C6D; --teal:#1C8CA8; --sun:#FFC845;
+  --sand:#FDF8EF; --ink:#12303F; --line:rgba(14,76,109,.14); --card:#FFF;
+  --bad:#D9534F; --food:#E8734A;
+  --minimal:#5B6670; --lovely:#E58AA6; --street:#3AA98C;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{
+  font-family:'NanumSquareRound','Gowun Dodum',sans-serif;color:var(--ink);line-height:1.65;
+  background:linear-gradient(180deg,var(--sky) 0%,#F7FBFD 360px,var(--sand) 100%);
+  min-height:100vh;
+  min-height:-webkit-fill-available;   /* iOS Safari 주소창 포함 높이 보정 */
+  -webkit-tap-highlight-color:rgba(28,140,168,.15);
+}
+button,.chip,.go,.more-btn{touch-action:manipulation}  /* iOS 더블탭 확대·지연 방지 */
+.wrap{max-width:960px;margin:0 auto;padding:0 20px 80px}
+.eyebrow{display:inline-block;font-size:12.5px;font-weight:700;letter-spacing:.12em;color:var(--teal);text-transform:uppercase;margin-bottom:8px}
+h1,h2,h3,.stars-title{font-family:'Jua',sans-serif;color:var(--sea);font-weight:400}
+h1{font-size:clamp(30px,5.4vw,48px);line-height:1.25;letter-spacing:-.01em}
+h2{font-size:clamp(22px,3.4vw,30px);margin-bottom:6px}
+.sub{color:#35566A;font-size:15px;font-weight:700}
+.sub-hero{font-size:clamp(16px,2.6vw,19px);margin-top:6px;font-family:'Jua',sans-serif;color:var(--teal)}
+section{margin-top:56px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:24px;margin-top:18px;overflow:hidden}
+
+/* ---------- 검색 폼 ---------- */
+header{padding:48px 0 0}
+.search-card{
+  background:var(--card);border:1px solid var(--line);border-radius:24px;
+  padding:28px;margin-top:22px;box-shadow:0 18px 40px -24px rgba(14,76,109,.35);
+  position:relative;overflow:hidden;
+}
+.search-card::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:10px;
+  background:radial-gradient(circle at 12px -4px, transparent 11px, var(--teal) 12px, var(--teal) 13px, transparent 14px) repeat-x;
+  background-size:34px 16px;opacity:.3;
+}
+.field-label{font-size:13px;font-weight:700;color:var(--teal);letter-spacing:.06em;margin-bottom:7px;display:block;font-family:'Jua',sans-serif}
+.addr-row{display:flex;gap:10px}
+#addr{
+  flex:1;font-family:inherit;font-size:16px;padding:13px 16px;border-radius:14px;
+  border:1.5px solid var(--line);background:#FBFDFE;color:var(--ink);outline:none;min-width:0;
+  transition:border-color .15s;
+}
+#addr:focus{border-color:var(--teal)}
+.go{
+  font-family:'Jua',sans-serif;font-size:16px;padding:13px 26px;border-radius:14px;
+  border:none;background:var(--sea);color:#fff;cursor:pointer;white-space:nowrap;
+  transition:transform .12s, background .15s;
+}
+@media(hover:hover){.go:hover{background:#0B3F5B;transform:translateY(-1px)}}
+.go:disabled{opacity:.55;cursor:wait;transform:none}
+.opts-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:20px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{
+  font-family:'Jua',sans-serif;font-size:14.5px;padding:9px 17px;border-radius:999px;
+  border:1.5px solid var(--line);background:#FBFDFE;color:var(--sea);cursor:pointer;
+  transition:all .13s;
+}
+@media(hover:hover){.chip:hover{border-color:var(--teal)}}
+.chip.on{background:var(--sea);border-color:var(--sea);color:#fff}
+.chip.on.ampm{background:var(--sun);border-color:var(--sun);color:var(--sea)}
+.opts-div{width:1.5px;height:26px;background:var(--line);margin:0 6px}
+.hint{font-size:12.5px;color:#5E7E8E;margin-top:14px;font-weight:700}
+@media(max-width:560px){.addr-row{flex-direction:column}.go{width:100%}.opts-div{display:none}}
+
+/* ---------- 상태 표시 ---------- */
+#status{margin-top:22px}
+.loading{
+  display:flex;align-items:center;gap:14px;background:var(--card);
+  border:1px solid var(--line);border-radius:16px;padding:18px 22px;font-size:14.5px;color:var(--sea);
+}
+.spin{
+  width:22px;height:22px;border-radius:50%;flex-shrink:0;
+  border:3px solid var(--sky);border-top-color:var(--teal);animation:sp .8s linear infinite;
+}
+@keyframes sp{to{transform:rotate(360deg)}}
+.errbox{
+  background:#FDF1F0;border:1px solid #F0C9C7;border-radius:16px;
+  padding:16px 20px;font-size:14px;color:#8A2F2B;
+}
+
+/* ---------- 선택 날짜 대형 배지 ---------- */
+.when-badge{
+  display:inline-flex;align-items:center;gap:10px;
+  font-family:'Jua',sans-serif;font-size:clamp(19px,3vw,24px);color:var(--sea);
+  background:linear-gradient(120deg,#FFE9AE,#FFC845);
+  border-radius:999px;padding:10px 24px;margin-bottom:14px;
+  box-shadow:0 8px 20px -10px rgba(255,168,0,.55);
+}
+.when-badge .dot{width:9px;height:9px;border-radius:50%;background:var(--sea)}
+
+/* ---------- 날씨 히어로 ---------- */
+.hero{
+  display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center;
+  background:var(--card);border:1px solid var(--line);border-radius:24px;
+  padding:30px 34px;margin-top:18px;box-shadow:0 18px 40px -24px rgba(14,76,109,.35);
+}
+.hero .temp{font-family:'Jua',sans-serif;font-size:clamp(42px,6.4vw,60px);color:var(--sea);line-height:1}
+.hero .temp small{font-size:.36em;color:var(--teal)}
+.badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.badge{font-size:13.5px;font-weight:700;padding:5px 12px;border-radius:999px;background:var(--sky);color:var(--sea);border:1px solid var(--line)}
+.badge.sun{background:#FFF4D6;border-color:#F2DFA6}
+.wx-emoji{font-size:clamp(64px,10vw,96px);line-height:1}
+@media(max-width:560px){.hero{grid-template-columns:1fr}.wx-emoji{justify-self:end}}
+
+.chart-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.wx{border-collapse:collapse;width:100%;min-width:560px;font-size:14px;margin-top:6px}
+table.wx th,table.wx td{padding:9px 10px;text-align:center;border-bottom:1px solid var(--line)}
+table.wx thead th{font-size:12.5px;color:var(--teal);border-bottom:2px solid var(--teal);font-family:'Jua',sans-serif;font-weight:400}
+table.wx tbody th{color:var(--sea);text-align:left;white-space:nowrap;font-family:'Jua',sans-serif;font-weight:400}
+table.wx td.hl{background:#FFF7E0;font-weight:700}
+.note{font-size:14px;color:#3E5C6E;margin-top:12px;font-weight:700}
+.note b{color:var(--sea)}
+
+/* ---------- 활동 ---------- */
+.acts{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:20px}
+@media(max-width:760px){.acts{grid-template-columns:1fr}}
+.act{
+  background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;
+  display:flex;flex-direction:column;padding-bottom:18px;
+  transition:transform .18s, box-shadow .18s;
+}
+@media(hover:hover){.act:hover{transform:translateY(-4px);box-shadow:0 16px 34px -20px rgba(14,76,109,.45)}}
+.act .art{height:120px;display:flex;align-items:center;justify-content:center}
+.act .art svg{width:100%;height:100%}
+.act-tag{
+  display:inline-block;font-size:12px;font-weight:800;color:var(--teal);
+  background:var(--sky);border:1px solid var(--line);border-radius:999px;
+  padding:3px 11px;margin-bottom:7px;
+}
+.ck.hidden{display:none}
+.more-btn{
+  font-family:'NanumSquareRound',sans-serif;font-size:13px;font-weight:800;
+  padding:8px 15px;border-radius:999px;border:1.5px dashed var(--teal);
+  background:#fff;color:var(--teal);cursor:pointer;transition:all .13s;
+}
+@media(hover:hover){.more-btn:hover{background:var(--sky)}}
+.act .body{padding:14px 20px 0}
+.act h3{font-size:20px}
+.stars{font-size:17px;letter-spacing:2px;color:var(--sun);margin:4px 0 10px}
+.stars .off{color:#DCE7EC}
+.why{list-style:none;font-size:14px;color:#2F4E5F;font-weight:700}
+.why li{padding-left:20px;position:relative;margin-bottom:5px}
+.why li::before{content:"✔";position:absolute;left:0;color:var(--teal);font-size:12px;top:1px}
+
+.ck-group{margin-top:20px}
+.ck-group:first-of-type{margin-top:6px}
+.ck-title{font-family:'Jua',sans-serif;font-size:16.5px;color:var(--sea);margin-bottom:9px;display:flex;align-items:center;gap:8px}
+.ck-title .tag{font-size:12px;font-family:'NanumSquareRound',sans-serif;font-weight:800;padding:3px 10px;border-radius:999px;background:var(--sky);color:var(--teal)}
+.checklist{display:flex;flex-wrap:wrap;gap:9px}
+.ck{font-size:14px;font-weight:700;padding:8px 15px;border-radius:999px;border:1px solid var(--line);background:#FBFDFE}
+.ck.ok{color:var(--sea)}
+.ck.no{color:#A0B2BC;background:#F4F7F9}
+.ck.no .lbl{text-decoration:line-through;text-decoration-color:rgba(160,178,188,.7)}
+.ck b{margin-right:6px}
+.ck.ok b{color:var(--teal)}
+.ck.no b{color:var(--bad)}
+.ck .st{margin-left:6px;color:var(--sun);font-size:12px;letter-spacing:1px}
+.ck.no .st{color:#CBD8DF}
+
+/* ---------- 장소 ---------- */
+.places{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-top:20px}
+@media(max-width:700px){.places{grid-template-columns:1fr}}
+.place{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;transition:transform .18s, box-shadow .18s}
+@media(hover:hover){.place:hover{transform:translateY(-3px);box-shadow:0 14px 30px -18px rgba(14,76,109,.4)}}
+.ph{position:relative;height:168px;background:linear-gradient(135deg,#CFE9F3,#EAF6FB);display:flex;align-items:center;justify-content:center;font-size:46px;cursor:pointer}
+.ph img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
+.ph .hover-hint{
+  position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(14,76,109,.55);color:#fff;font-family:'Jua',sans-serif;font-size:15px;
+  opacity:0;transition:opacity .18s;z-index:3;
+}
+@media(hover:hover){.ph:hover .hover-hint{opacity:1}}
+@media(hover:none){.ph .hover-hint{display:none}}
+.num{position:absolute;top:12px;left:12px;width:30px;height:30px;border-radius:50%;background:var(--sea);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:2;font-family:'Jua',sans-serif}
+.cat{position:absolute;top:12px;right:12px;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.92);color:var(--sea);z-index:2}
+.cat.indoor{background:rgba(14,76,109,.88);color:#fff}
+.place .pb{padding:14px 18px 16px}
+.place h3{font-size:17.5px}
+.meta{font-size:13px;color:#456578;margin-top:3px;font-weight:700}
+.kakao-link{font-size:12.5px;font-weight:800;color:var(--teal);margin-top:6px;display:inline-block;text-decoration:none}
+.kakao-link:hover{text-decoration:underline}
+.scorebar{height:6px;border-radius:99px;background:#E4EFF4;margin-top:10px;overflow:hidden}
+.scorebar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--teal),var(--sun))}
+.score-lb{display:flex;justify-content:space-between;font-size:12px;color:#4A6B7C;margin-top:4px;font-weight:700}
+
+/* ---------- OOTD ---------- */
+.mood-tabs{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.mtab{font-family:'Jua',sans-serif;font-size:14.5px;padding:9px 18px;border-radius:999px;
+  border:1.5px solid var(--line);background:var(--card);color:#5A7383;cursor:pointer;transition:.15s}
+.mtab:hover{border-color:var(--teal)}
+.mtab.is-on{color:#fff;border-color:transparent}
+.mtab.is-on[data-mood="min"]{background:var(--minimal)}
+.mtab.is-on[data-mood="lov"]{background:var(--lovely)}
+.mtab.is-on[data-mood="str"]{background:var(--street)}
+.mtab.reroll{margin-left:auto;color:var(--teal);border-style:dashed}
+.mtab.reroll:active{transform:scale(.96)}
+@media(max-width:520px){.mtab.reroll{margin-left:0;width:100%}}
+.ootd-card{display:grid;grid-template-columns:296px 1fr;background:var(--card);
+  border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-top:18px;border-top:4px solid var(--line)}
+.ootd-card.m-min{border-top-color:var(--minimal)}
+.ootd-card.m-lov{border-top-color:var(--lovely)}
+.ootd-card.m-str{border-top-color:var(--street)}
+@media(max-width:700px){.ootd-card{grid-template-columns:1fr}}
+.ootd-art{position:relative;min-height:300px;display:flex;align-items:center;justify-content:center;padding:10px}
+.ootd-art svg{width:100%;height:100%;max-height:300px}
+.ootd-art .temp-badge{position:absolute;top:12px;left:12px;background:rgba(255,255,255,.9);
+  color:var(--sea);font-family:'Jua',sans-serif;font-size:14px;padding:4px 11px;border-radius:999px;
+  box-shadow:0 2px 8px rgba(14,76,109,.15)}
+.ootd-art .wx-badge{position:absolute;top:10px;right:14px;font-size:21px}
+.ootd-body{padding:20px 22px 22px}
+.mood-tag{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.mood-dot{width:11px;height:11px;border-radius:50%}
+.m-min .mood-dot{background:var(--minimal)} .m-lov .mood-dot{background:var(--lovely)} .m-str .mood-dot{background:var(--street)}
+.mood-name{font-family:'Jua',sans-serif;font-size:15px}
+.m-min .mood-name{color:var(--minimal)} .m-lov .mood-name{color:var(--lovely)} .m-str .mood-name{color:var(--street)}
+.mood-en{font-size:11px;color:#9AB0BD;font-weight:700;letter-spacing:.08em;margin-left:auto}
+.ootd-body h3{font-family:'Jua',sans-serif;font-size:20px;color:var(--sea);font-weight:400}
+.ootd-body .concept{font-size:13.5px;color:#456578;font-weight:700;margin-top:2px}
+.ootd-items{list-style:none;margin:13px 0 0;display:flex;flex-direction:column;gap:6px}
+.ootd-items li{font-size:14px;color:var(--ink);display:flex;gap:8px;align-items:baseline}
+.ootd-items li b{color:var(--teal);font-weight:800;min-width:46px;font-size:12px}
+.ootd-reason{margin-top:14px;font-size:13px;color:#5A7383;background:var(--sky);
+  border-radius:10px;padding:10px 12px;line-height:1.6}
+.ootd-tags{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
+.ootd-tags .tag{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:999px}
+.m-min .ootd-tags .tag{color:var(--minimal);background:rgba(91,102,112,.1)}
+.m-lov .ootd-tags .tag{color:var(--lovely);background:rgba(229,138,166,.13)}
+.m-str .ootd-tags .tag{color:var(--street);background:rgba(58,169,140,.12)}
+
+.retry-btn{display:block;margin-top:12px;font-family:'Jua',sans-serif;font-size:14px;
+  padding:9px 20px;border-radius:999px;border:1.5px solid currentColor;background:transparent;
+  color:inherit;cursor:pointer;transition:.15s}
+.retry-btn:hover{background:rgba(255,255,255,.5)}
+.retry-btn:active{transform:scale(.97)}
+
+#map{height:420px;border-radius:20px;border:1px solid var(--line);margin-top:20px;z-index:0}
+.coord-table{width:100%;border-collapse:collapse;font-size:14px}
+.coord-table th,.coord-table td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left}
+.coord-table thead th{font-size:13px;color:var(--teal);border-bottom:2px solid var(--teal);font-family:'Jua',sans-serif;font-weight:400}
+.coord-table td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pin{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--sea);color:#fff;font-size:12.5px;align-items:center;justify-content:center;font-family:'Jua',sans-serif}
+.pin.home{background:var(--sun);color:var(--sea)}
+.pin.food{background:var(--food);color:#fff}
+.marker-num{background:var(--sea);color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);font-family:'Jua',sans-serif}
+.marker-num.home{background:var(--sun);color:var(--sea)}
+.marker-num.food{background:var(--food);color:#fff}
+/* 지도 범례 */
+.map-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:13px;color:#456578;font-weight:700}
+.map-legend .lg{display:inline-flex;align-items:center;gap:6px}
+.map-legend .dot{width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.map-legend .dot.tour{background:var(--sea)}
+.map-legend .dot.food{background:var(--food)}
+.map-legend .dot.home{background:var(--sun)}
+footer{margin-top:70px;font-size:12px;color:#7A96A6;text-align:center}
+#results{display:none}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="jsNotice" style="margin:14px;padding:14px 18px;border-radius:14px;background:#FDF1F0;border:1px solid #F0C9C7;color:#8A2F2B;font-size:14px;line-height:1.6">
+  ⚠️ 이 화면이 계속 보이면 지금 환경에서 <b>자바스크립트가 실행되지 않는 상태</b>예요.<br>
+  아이폰의 '파일' 앱·카카오톡 <b>미리보기(Quick Look)</b>는 스크립트와 외부 데이터를 차단해서 앱이 동작하지 않아요.<br>
+  → 파일을 <b>웹에 올린 뒤 Safari에서 주소로 열거나</b>, 로컬 서버(예: 내 컴퓨터에서 <code>python -m http.server</code>) 주소로 접속해 주세요.
+</div>
+<script>document.getElementById("jsNotice").style.display="none";</script>
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">☀️ Daily Pick</span>
+  <h1>오늘 하루, 어디서 뭐 할까?</h1>
+  <p class="sub-hero">오늘도 갈 곳을 못 정한 당신에게 🧭</p>
+
+  <div class="search-card">
+    <label class="field-label" for="addr">주소 입력</label>
+    <div class="addr-row">
+      <input id="addr" type="text" value="인천 영종구 운남서로 100"
+             placeholder="예) 인천 영종구 운남서로 100 / 서울 마포구 월드컵로 240"
+             autocomplete="street-address" enterkeyhint="go" inputmode="text">
+      <button class="go" id="goBtn" type="button">추천 받기</button>
+    </div>
+
+    <div class="opts-row">
+      <div class="chips" id="dateChips"></div>
+      <div class="opts-div"></div>
+      <div class="chips" id="ampmChips">
+        <button class="chip ampm" data-v="AM" type="button">🌤 오전</button>
+        <button class="chip ampm on" data-v="PM" type="button">🌇 오후</button>
+      </div>
+    </div>
+    <p class="hint">Enter 키로도 검색돼요 · 예보 발표 시각에 따라 글피 자료는 일부만 제공될 수 있어요</p>
+  </div>
+
+  <div id="status"></div>
+</header>
+
+<!-- ================= 결과 ================= -->
+<div id="results">
+
+<section id="secWeather">
+  <div class="when-badge"><span class="dot"></span><span id="whenText">–</span></div>
+  <h2 id="wxTitle">날씨 요약</h2>
+  <p class="sub" id="wxSub"></p>
+
+  <div class="hero">
+    <div>
+      <div class="temp"><span id="wxTemp">–</span><small id="wxTempLb">°C 최고</small></div>
+      <div class="badges" id="wxBadges"></div>
+    </div>
+    <div class="wx-emoji" id="wxEmoji">☀️</div>
+  </div>
+
+  <div class="panel chart-scroll">
+    <svg id="tempChart" viewBox="0 0 720 190" width="100%" style="min-width:560px" role="img" aria-label="시간별 기온 그래프"></svg>
+  </div>
+
+  <div class="panel chart-scroll">
+    <table class="wx">
+      <thead><tr id="wxHead"></tr></thead>
+      <tbody id="wxBody"></tbody>
+    </table>
+    <p class="note" id="wxNote"></p>
+  </div>
+</section>
+
+<section id="secActs">
+  <span class="eyebrow">Top 3 Picks</span>
+  <h2>오늘은 이거 어때요?</h2>
+  <p class="sub" id="actSub"></p>
+  <div class="acts" id="actCards"></div>
+  <div class="panel" id="actChecklist"></div>
+</section>
+
+<section id="secOotd">
+  <span class="eyebrow">Today's OOTD</span>
+  <h2>오늘 뭐 입지? OOTD 추천!</h2>
+  <p class="sub" id="ootdSub"></p>
+  <div class="mood-tabs" id="moodTabs">
+    <button type="button" class="mtab is-on" data-mood="min">미니멀</button>
+    <button type="button" class="mtab" data-mood="lov">러블리</button>
+    <button type="button" class="mtab" data-mood="str">스트릿</button>
+    <button type="button" class="mtab reroll" id="ootdReroll" title="같은 무드의 다른 코디 보기">🔄 다른 코디</button>
+  </div>
+  <div id="ootdCard"></div>
+</section>
+
+<section id="secPlaces">
+  <span class="eyebrow">Nearby · 반경 3km</span>
+  <h2>동네 한 바퀴 어디로?</h2>
+  <p class="sub" id="plSub"></p>
+  <div class="places" id="plCards"></div>
+</section>
+
+<section id="secFood">
+  <span class="eyebrow">Cafe &amp; Food · 반경 3km</span>
+  <h2>커피 한잔 할래요? 밥도 좋고 ☕</h2>
+  <p class="sub" id="flSub"></p>
+  <div class="places" id="flCards"></div>
+</section>
+
+<section id="secMap">
+  <h2>지도로 보기</h2>
+  <p class="sub">노란 핀은 입력한 주소예요. <b style="color:var(--sea)">파란 번호</b>는 관광·나들이, <b style="color:var(--food)">주황 번호</b>는 카페·음식점이에요. 사진이나 핀을 누르면 카카오맵이 열려요.</p>
+  <div id="map"></div>
+  <div class="map-legend">
+    <span class="lg"><span class="dot home"></span>입력 주소</span>
+    <span class="lg"><span class="dot tour"></span>관광·나들이 (1~4)</span>
+    <span class="lg"><span class="dot food"></span>카페·음식점 (5~8)</span>
+  </div>
+  <div class="panel chart-scroll">
+    <table class="coord-table">
+      <thead><tr><th>번호</th><th>장소</th><th>분류</th><th style="text-align:right">거리</th><th style="text-align:right">추천점수</th></tr></thead>
+      <tbody id="coordBody"></tbody>
+    </table>
+  </div>
+</section>
+
+</div><!-- /results -->
+
+<footer>
+  데이터: 기상청 단기예보 API · 카카오 로컬 API · 한국관광공사 TourAPI · 지도: OpenStreetMap / 카카오맵<br>
+  예보는 발표 시각에 따라 달라질 수 있어요
+</footer>
+</div>
+
+<script>
+/* =========================================================
+   설정 — API 키는 클라이언트에 두지 않습니다.
+   모든 외부 API 호출은 같은 도메인의 /api 프록시(Netlify Functions)를
+   통해 이뤄지며, 실제 키는 서버 환경변수에만 존재합니다.
+========================================================= */
+const RADIUS_M  = 3000;
+
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => "" + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate());
+
+/* ---------- 날짜 칩 (오늘/내일/모레/글피) ---------- */
+const DAY_LB = ["오늘","내일","모레","글피"];
+const WEEK = ["일","월","화","수","목","금","토"];
+let selDay = 0, selAmPm = "PM";
+(function(){
+  const box = $("dateChips");
+  DAY_LB.forEach((lb,i)=>{
+    const b=document.createElement("button");
+    b.type="button"; b.className="chip"+(i===selDay?" on":"");
+    b.textContent=lb;
+    b.onclick=()=>{selDay=i;[...box.children].forEach(c=>c.classList.toggle("on",c===b));};
+    box.appendChild(b);
+  });
+  $("ampmChips").querySelectorAll(".chip").forEach(b=>{
+    b.onclick=()=>{selAmPm=b.dataset.v;
+      $("ampmChips").querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",c===b));};
+  });
+})();
+
+/* ---------- 위경도 → 기상청 격자 (LCC DFS) ---------- */
+function latlonToGrid(lat,lon){
+  const RE=6371.00877/5.0, DEG=Math.PI/180;
+  const SLAT1=30*DEG,SLAT2=60*DEG,OLON=126*DEG,OLAT=38*DEG,XO=43,YO=136;
+  let sn=Math.tan(Math.PI/4+SLAT2/2)/Math.tan(Math.PI/4+SLAT1/2);
+  sn=Math.log(Math.cos(SLAT1)/Math.cos(SLAT2))/Math.log(sn);
+  const sf=Math.pow(Math.tan(Math.PI/4+SLAT1/2),sn)*Math.cos(SLAT1)/sn;
+  const ro=RE*sf/Math.pow(Math.tan(Math.PI/4+OLAT/2),sn);
+  const ra=RE*sf/Math.pow(Math.tan(Math.PI/4+lat*DEG/2),sn);
+  let th=lon*DEG-OLON;
+  if(th>Math.PI)th-=2*Math.PI; if(th<-Math.PI)th+=2*Math.PI;
+  th*=sn;
+  return {nx:Math.floor(ra*Math.sin(th)+XO+0.5), ny:Math.floor(ro-ra*Math.cos(th)+YO+0.5)};
+}
+
+/* ---------- 단기예보 최신 발표시각 ---------- */
+/* ---------- 재시도 유틸 ----------
+   공공데이터포털 게이트웨이는 502/503/504 를 간헐적으로 냅니다(기상청 서버 연계 지연).
+   일시적 오류는 잠시 뒤 다시 부르면 대부분 성공하므로 자동 재시도합니다. */
+function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+
+async function fetchRetry(url, opt, tries){
+  tries = tries || 3;
+  let lastErr=null;
+  for(let i=0;i<tries;i++){
+    try{
+      const r=await fetch(url,opt);
+      if(r.ok) return r;
+      // 5xx는 서버측 일시 오류 → 재시도 / 4xx는 키·파라미터 문제 → 즉시 반환
+      if(r.status>=500){
+        lastErr=new Error("HTTP "+r.status);
+        if(i<tries-1){ await sleep(900*(i+1)); continue; }
+      }
+      return r;
+    }catch(e){
+      lastErr=e;
+      if(i<tries-1){ await sleep(900*(i+1)); continue; }
+      throw e;
+    }
+  }
+  throw lastErr || new Error("요청 실패");
+}
+
+/* 최신 발표시각부터 과거로 n개 후보를 만듭니다 (최신분이 없으면 이전 발표분 사용) */
+function vilageBases(n){
+  const slots=[2,5,8,11,14,17,20,23];
+  const out=[];
+  let ref=new Date(Date.now()-10*60000);
+  let guard=0;
+  while(out.length<n && guard++<24){
+    let found=-1;
+    for(let i=slots.length-1;i>=0;i--){ if(ref.getHours()>=slots[i]){ found=i; break; } }
+    if(found<0){
+      ref=new Date(ref.getTime()-86400000);
+      ref.setHours(23,59,0,0);
+      continue;
+    }
+    out.push({date:ymd(ref), time:pad(slots[found])+"00"});
+    const h=slots[found];
+    ref=new Date(ref.getTime());
+    ref.setHours(h-1,59,0,0);
+  }
+  return out;
+}
+
+function latestVilageBase(){
+  const slots=[2,5,8,11,14,17,20,23];
+  const ref=new Date(Date.now()-10*60000);
+  for(let i=slots.length-1;i>=0;i--)
+    if(ref.getHours()>=slots[i]) return {date:ymd(ref), time:pad(slots[i])+"00"};
+  const prev=new Date(ref.getTime()-86400000);
+  return {date:ymd(prev), time:"2300"};
+}
+
+/* ---------- API 호출 ---------- */
+async function geocode(addr){
+  const url="/api/kakao?type=address&size=1&query="+encodeURIComponent(addr);
+  let r=await fetch(url);
+  if(!r.ok) throw new Error("카카오 주소검색 실패 (HTTP "+r.status+") — REST API 키를 확인하세요.");
+  let j=await r.json();
+  if(!j.documents || !j.documents.length){
+    const kw="/api/kakao?type=keyword&size=1&query="+encodeURIComponent(addr);
+    r=await fetch(kw);
+    j=r.ok?await r.json():{documents:[]};
+    if(!j.documents.length) throw new Error("주소를 찾지 못했어요. 시·도와 도로명/번지를 포함해 다시 입력해 주세요.");
+  }
+  const d=j.documents[0];
+  return {lat:+d.y, lon:+d.x, name:d.address_name || d.place_name || addr};
+}
+
+async function fetchVilage(nx,ny){
+  const bases=vilageBases(3);   // 최신 발표분 → 실패 시 이전 발표분까지 시도
+  let lastMsg="";
+  for(let i=0;i<bases.length;i++){
+    const b=bases[i];
+    const url="/api/vilage"
+      +"?dataType=JSON&numOfRows=1000&pageNo=1"
+      +"&base_date="+b.date+"&base_time="+b.time+"&nx="+nx+"&ny="+ny;
+    let r;
+    try{
+      r=await fetchRetry(url, undefined, 3);
+    }catch(e){
+      lastMsg="네트워크 연결 실패";
+      continue;
+    }
+    if(!r.ok){ lastMsg="HTTP "+r.status; continue; }
+    let j;
+    try{ j=await r.json(); }
+    catch(_){ lastMsg="응답을 해석하지 못했어요"; continue; }
+    const h=j.response && j.response.header;
+    if(!h || (h.resultCode!=="00" && h.resultCode!=="0")){
+      lastMsg=h?h.resultMsg:"응답 형식 오류";
+      continue;
+    }
+    const items=(j.response.body && j.response.body.items && j.response.body.items.item) || [];
+    if(!items.length){ lastMsg="해당 발표분 자료 없음"; continue; }
+    return {items:items, base:b};
+  }
+  const err=new Error("기상청 서버가 지금 응답하지 않아요 ("+lastMsg+"). "
+    +"기상청 API가 일시적으로 불안정할 때 자주 생기는 문제로, 잠시 후 다시 시도하면 대개 정상 동작해요.");
+  err.wxDown=true;
+  throw err;
+}
+
+async function fetchTour(lat,lon,typeId){
+  const url="/api/tour"
+    +"?numOfRows=100&pageNo=1&MobileOS=ETC&MobileApp=DailyPick"
+    +"&_type=json&arrange=E&contentTypeId="+typeId+"&mapX="+lon+"&mapY="+lat+"&radius="+RADIUS_M;
+  let r;
+  try{ r=await fetchRetry(url, undefined, 2); }
+  catch(_){ return []; }
+  if(!r.ok) return [];
+  const j=await r.json().catch(()=>null);
+  if(!j || !j.response || j.response.header.resultCode!=="0000") return [];
+  let it=j.response.body.items && j.response.body.items.item;
+  if(!it) return [];
+  return Array.isArray(it)?it:[it];
+}
+
+/* ---------- 카카오 로컬 카테고리 검색 (카페 CE7 / 음식점 FD6) ---------- */
+/* x=경도, y=위도, radius 최대 20km, size 최대 15, 한 코드당 최대 45건 노출 */
+async function fetchKakaoCategory(lat,lon,code){
+  const out=[];
+  for(let page=1;page<=3;page++){
+    const url="/api/kakao?type=category"
+      +"&category_group_code="+code
+      +"&x="+lon+"&y="+lat+"&radius="+RADIUS_M
+      +"&size=15&page="+page+"&sort=distance";
+    let r;
+    try{ r=await fetch(url); }
+    catch(_){ break; }
+    if(!r.ok) break;
+    const j=await r.json().catch(()=>null);
+    if(!j || !Array.isArray(j.documents)) break;
+    out.push(...j.documents);
+    if(!j.meta || j.meta.is_end) break;
+  }
+  return out;
+}
+
+/* 출처 간 중복 판정: 정규화한 이름이 같고 150m 이내면 같은 곳으로 봄 */
+function normName(s){ return (s||"").toLowerCase().replace(/[^0-9a-z가-힣]/g,""); }
+function isSamePlace(a,b){
+  if(normName(a.name)!==normName(b.name)) return false;
+  return haversine(a.lat,a.lon,b.lat,b.lon)<=150;
+}
+
+/* ---------- 실내/실외 추정 ---------- */
+const INDOOR_KW=["박물관","미술관","전시관","기념관","문화관","과학관","도서관","공연장","극장","아트센터","체험관","수족관","아쿠아리움","실내","볼링","빙상장","체육관","수영장","스크린","센터","카페","커피","베이커리","디저트","브런치","식당","맛집","레스토랑"];
+const OUTDOOR_KW=["공원","해수욕장","산","숲","정원","수목원","둘레길","산책로","유적","성곽","계곡","폭포","섬","전망대","캠핑","야영","골프장","스키장","승마","낚시","래프팅","패러글라이딩","자전거","트레킹"];
+function inferIO(cat,name){
+  if(INDOOR_KW.some(k=>name.includes(k))) return "실내";
+  if(OUTDOOR_KW.some(k=>name.includes(k))) return "실외";
+  if(cat==="문화시설"||cat==="카페"||cat==="음식점") return "실내";
+  return "실외";
+}
+const CAT_EMOJI={"관광지":"🏞","문화시설":"🏛","레포츠":"⛺","공원":"🌳","카페":"☕","음식점":"🍽"};
+
+/* ---------- 날짜/시간대별 날씨 집계 ---------- */
+const SKY_LB={1:"맑음",3:"구름많음",4:"흐림"};
+const SKY_EM={1:"☀️",3:"⛅",4:"☁️"};
+const PTY_EM={1:"🌧",2:"🌨",3:"❄️",4:"🌦"};
+function sliceWeather(items, dateStr, ampm){
+  const [h0,h1] = ampm==="AM"?[6,12]:[12,21];
+  const by={};
+  for(const it of items){
+    if(it.fcstDate!==dateStr) continue;
+    const h=+it.fcstTime.slice(0,2);
+    if(h<h0||h>h1) continue;
+    (by[it.fcstTime]=by[it.fcstTime]||{})[it.category]=it.fcstValue;
+  }
+  const hours=Object.keys(by).sort();
+  if(!hours.length) return null;
+  const num=v=>{const f=parseFloat(v);return isNaN(f)?null:f};
+  const rows=hours.map(t=>({
+    t, tmp:num(by[t].TMP), sky:+by[t].SKY||1, pty:+by[t].PTY||0,
+    pop:num(by[t].POP)||0, reh:num(by[t].REH)||0, wsd:num(by[t].WSD)||0
+  })).filter(r=>r.tmp!=null);
+  if(!rows.length) return null;
+  const tmps=rows.map(r=>r.tmp);
+  return {
+    rows,
+    tMax:Math.max(...tmps), tMin:Math.min(...tmps),
+    popMax:Math.max(...rows.map(r=>r.pop)),
+    rehAvg:Math.round(rows.reduce((s,r)=>s+r.reh,0)/rows.length),
+    wsdMax:Math.max(...rows.map(r=>r.wsd)),
+    rain:rows.some(r=>r.pty>0),
+    snow:rows.some(r=>[2,3,6,7].includes(r.pty)),
+    skyMode:(()=>{const c={};rows.forEach(r=>c[r.sky]=(c[r.sky]||0)+1);
+      return +Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0];})()
+  };
+}
+
+/* ---------- 활동 점수화 ----------
+   그룹: outSport 나가서 운동해요 / outPlay 밖에서 놀아요 /
+        inSport 운동은 못 참지, 실내 운동 / inFun 실내에서 즐겨요 / home 집밖은 위험해 */
+function scoreActivities(w, ampm){
+  const rainy=w.rain||w.popMax>=60, maybeRain=w.popMax>=40;
+  const veryHot=w.tMax>=32, hot=w.tMax>=30, warm=w.tMax>=28;
+  const cold=w.tMax<=3, chilly=w.tMax<=8;
+  const windy=w.wsdMax>=8, breeze=w.wsdMax>=6;
+  const humid=w.rehAvg>=80, dry=w.rehAvg<=65;
+  const clamp=s=>Math.max(1,Math.min(5,s));
+  const badOut = rainy?3 : maybeRain?1 : 0;
+  const heatPen = veryHot?3 : hot?2 : warm?1 : 0;
+  const coldPen = cold?3 : chilly?1 : 0;
+
+  const items=[];
+  const add=(group,name,emoji,stars,reasons,art)=>items.push({group,name,emoji,stars:clamp(stars),reasons,art});
+  const R={
+    rain: rainy?"비 소식이 있어요":(maybeRain?`강수확률 ${w.popMax}%`:`강수확률 ${w.popMax}% — 비 걱정 없음`),
+    heat: veryHot?`${w.tMax}° 폭염 수준`:(hot?`한낮 ${w.tMax}°로 더움`:(warm?`${w.tMax}°로 다소 더움`:`기온 ${w.tMin}~${w.tMax}° 쾌적`)),
+    sky: w.skyMode===1?"맑은 하늘":(w.skyMode===3?"구름 사이 햇살":"흐린 하늘"),
+    wind: windy?`바람 강함 (${w.wsdMax}m/s)`:(breeze?"바람 조금":"바람 잔잔"),
+    evening:(ampm==="PM"&&warm&&!rainy)?"저녁 시간대가 골든타임":null
+  };
+  const pick=(...a)=>a.filter(Boolean).slice(0,3);
+
+  /* 나가서 운동해요 */
+  add("outSport","산책","🚶‍♀️",5-badOut-Math.max(0,heatPen-1)-coldPen,pick(R.rain,R.heat,R.evening||R.sky),"linear-gradient(160deg,#FDEBD8,#F9D9C0)");
+  add("outSport","러닝","🏃‍♀️",5-badOut-heatPen-(humid?1:0),pick(R.rain,R.heat,humid?`습도 ${w.rehAvg}%로 체감 부담`:R.evening||R.sky),"linear-gradient(160deg,#E8F5EE,#D2EBDD)");
+  add("outSport","등산","⛰",5-(rainy?4:maybeRain?1:0)-Math.max(0,heatPen)-(windy?1:0),pick(rainy?"우천 시 산행 위험":R.rain,hot?"온열질환 주의":R.heat,R.sky),"linear-gradient(160deg,#E9F0E4,#D8E6CE)");
+  add("outSport","자전거","🚴‍♀️",5-badOut-heatPen-(windy?2:0),pick(R.rain,hot?`노면 복사열 부담 (${w.tMax}°)`:R.heat,windy?`맞바람 ${w.wsdMax}m/s`:R.wind),"linear-gradient(160deg,#EAF6FB,#CFE9F3)");
+  add("outSport","풋살","⚽",5-badOut-heatPen,pick(R.rain,R.heat,"팀 모으기 좋은 날"),"linear-gradient(160deg,#E8F5EE,#CDE9D8)");
+  add("outSport","배드민턴(야외)","🏸",5-badOut-(windy?3:breeze?2:0)-Math.max(0,heatPen-1),pick(windy||breeze?"바람에 셔틀콕 흔들려요":R.wind,R.rain,R.heat),"linear-gradient(160deg,#FFF4D6,#FFE9B8)");
+
+  /* 밖에서 놀아요 */
+  add("outPlay","피크닉","🧺",5-(rainy?4:maybeRain?1:0)-Math.max(0,heatPen-1)-(windy?1:0),pick(R.rain,warm?"그늘 자리 추천":R.heat,R.sky),"linear-gradient(160deg,#FDF3E3,#F7E6C7)");
+  add("outPlay","캠핑","⛺",5-(rainy?3:maybeRain?1:0)-(windy?2:0)-coldPen,pick(rainy?"텐트 젖을 수 있어요":R.rain,windy?"타프 설치 어려운 바람":R.wind,(w.tMin>=18&&w.tMax<=32&&!rainy)?`밤에도 ${w.tMin}°로 포근`:R.heat),"linear-gradient(160deg,#FDF3E3,#F2DFC0)");
+  add("outPlay","낚시","🎣",5-(rainy?3:0)-(windy?2:breeze?1:0)-Math.max(0,heatPen-1),pick(R.rain,windy?"바람 불면 입질 보기 힘들어요":R.wind,R.heat),"linear-gradient(160deg,#EAF6FB,#D2ECF5)");
+  add("outPlay","공원 나들이","🌳",5-badOut-Math.max(0,heatPen-1),pick(R.rain,R.heat,R.evening||R.sky),"linear-gradient(160deg,#E9F0E4,#DCEBD2)");
+  add("outPlay","드라이브","🚗",5-(rainy?1:0)+(hot?0:0),pick(rainy?"빗길 감속 운전":"창문 열고 달리기 좋아요",R.sky,hot?"에어컨 켜고 시원하게":R.heat),"linear-gradient(160deg,#FFF4D6,#FFE9B8)");
+  add("outPlay","사진 촬영","📸",5-(rainy?2:0)-(w.skyMode===4?1:0),pick(w.skyMode===1?"쨍한 빛, 채도 최고":(w.skyMode===3?"구름이 자연 반사판 역할":"흐린 날은 감성샷 각"),R.rain,R.evening),"linear-gradient(160deg,#F3EDE6,#E9DFD2)");
+
+  /* 운동은 못 참지, 실내 운동 */
+  const inBoost=(rainy||veryHot||cold)?1:0;
+  const inR=rainy?"비 오는 날엔 실내가 답":veryHot?"더위 피해 시원하게":cold?"추위 피해 따뜻하게":"날씨와 무관하게 굿";
+  add("inSport","헬스","🏋️‍♀️",4+inBoost,pick(inR,"컨디션 조절하기 좋은 날"),"linear-gradient(160deg,#EAF6FB,#D6EEF7)");
+  add("inSport","요가·필라테스","🧘‍♀️",4+inBoost,pick(inR,"몸과 마음 리셋"),"linear-gradient(160deg,#F3EDE6,#EADFD0)");
+  add("inSport","수영","🏊‍♀️",4+(hot?1:0),pick(hot?"더운 날 수영이 진리":"실내 수영장은 사계절 OK",inR),"linear-gradient(160deg,#D9F0F8,#C2E6F2)");
+  add("inSport","볼링","🎳",4+inBoost,pick(inR,"친구들과 내기 한 판"),"linear-gradient(160deg,#FFF4D6,#FFE9B8)");
+  add("inSport","탁구","🏓",4+inBoost,pick(inR,"가볍게 땀내기 좋아요"),"linear-gradient(160deg,#E8F5EE,#D2EBDD)");
+  add("inSport","실내 클라이밍","🧗‍♀️",4+inBoost,pick(inR,"요즘 대세 운동"),"linear-gradient(160deg,#EFEAE2,#E3DACB)");
+
+  /* 실내에서 즐겨요 */
+  const funBase=(rainy||veryHot||cold)?5:3;
+  const funR=rainy?"비 오는 날 최고의 대안":veryHot?`한낮 ${w.tMax}° 더위 피하기 좋음`:cold?"추운 날 실내 데이트":"언제든 무난한 선택";
+  add("inFun","영화","🎬",funBase,pick(funR,"팝콘은 못 참지"),"linear-gradient(160deg,#EAE6F2,#DCD4EA)");
+  add("inFun","전시회","🖼",funBase,pick(funR,"감성 충전 타임"),"linear-gradient(160deg,#F3EDE6,#E9DFD2)");
+  add("inFun","박물관","🏛",funBase,pick(funR,"시원하고 조용한 힐링"),"linear-gradient(160deg,#EDF1E6,#E0E8D4)");
+  add("inFun","쇼핑몰","🛍",funBase,pick(funR,"아이쇼핑만 해도 기분전환"),"linear-gradient(160deg,#FDEBEB,#F8D9DB)");
+  add("inFun","아쿠아리움","🐠",funBase+(hot?0:0),pick(funR,"보기만 해도 시원해요"),"linear-gradient(160deg,#D9F0F8,#C2E6F2)");
+  add("inFun","보드게임카페","🎲",funBase,pick(funR,"시간 순삭 주의"),"linear-gradient(160deg,#FFF4D6,#FFE9B8)");
+
+  /* 집밖은 위험해 */
+  let laundry=5;
+  const lr=[];
+  if(w.rain){laundry-=3;lr.push("강수 예보 있음")}
+  else if(w.popMax>=60){laundry-=2;lr.push(`강수확률 ${w.popMax}%`)}
+  else if(w.popMax>=40){laundry-=1;lr.push(`강수확률 ${w.popMax}%`)}
+  else lr.push(`강수확률 ${w.popMax}% — 비 걱정 없음`);
+  if(humid){laundry-=2;lr.push(`습도 ${w.rehAvg}%로 높음`)}
+  else if(dry)lr.push(`습도 ${w.rehAvg}% — 건조 잘됨`);
+  if(w.skyMode===1)lr.push("햇살 건조 가능");
+  add("home","빨래","🧺",laundry,lr.slice(0,3),"linear-gradient(160deg,#EAF6FB,#D6EEF7)");
+  add("home","환기","🪟",rainy?2:(humid?3:5),pick(rainy?"비 들이칠 수 있어요":"공기 갈아끼우기 좋은 날",dry?"습도 낮아 뽀송해져요":null),"linear-gradient(160deg,#E9F0E4,#DCEBD2)");
+  const homeBase=(rainy||veryHot||cold)?5:3;
+  const homeR=rainy?"빗소리 들으며 최고":veryHot?"에어컨 아래가 천국":cold?"이불 밖은 위험해":"쉬는 것도 능력";
+  add("home","독서","📚",homeBase,pick(homeR,"밀린 책 정주행"),"linear-gradient(160deg,#F3EDE6,#E9DFD2)");
+  add("home","홈트","💪",homeBase,pick(homeR,"매트 하나면 충분"),"linear-gradient(160deg,#E8F5EE,#D2EBDD)");
+  add("home","영화 보기","📺",homeBase,pick(homeR,"OTT 정주행 각"),"linear-gradient(160deg,#EAE6F2,#DCD4EA)");
+  add("home","휴식","😴",homeBase,pick(homeR,"아무것도 안 하기 챌린지"),"linear-gradient(160deg,#FDF3E3,#F7E6C7)");
+
+  return items;
+}
+
+/* ---------- 렌더링 ---------- */
+function starHTML(n){
+  let h="";
+  for(let i=1;i<=5;i++) h+= i<=n ? "★" : '<span class="off">★</span>';
+  return h;
+}
+function renderWeather(w, ampm){
+  $("whenText").textContent = `${DAY_LB[selDay]} ${ampm==="AM"?"오전":"오후"} (${ampm==="AM"?"06–12시":"12–21시"})`;
+  const rainy=w.rain||w.popMax>=60;
+  $("wxTitle").textContent = rainy ? "우산 챙기세요, 비 소식이 있어요" :
+    w.tMax>=30 ? "맑고 더운 날, 한낮만 피하면 좋아요" :
+    w.tMax<=5 ? "쌀쌀한 날, 따뜻하게 입고 나가요" : "나들이하기 좋은 날씨예요";
+  $("wxSub").textContent = `기온 ${w.tMin}~${w.tMax}°C · 강수확률 최대 ${w.popMax}% · 평균 습도 ${w.rehAvg}%`;
+  $("wxTemp").textContent = w.tMax;
+  $("wxEmoji").textContent = w.rain ? (w.snow?"🌨":"🌧") : SKY_EM[w.skyMode]||"☀️";
+  $("wxBadges").innerHTML = [
+    `<span class="badge sun">${SKY_EM[w.skyMode]||"☀️"} ${SKY_LB[w.skyMode]||""}</span>`,
+    `<span class="badge">💧 강수확률 최대 ${w.popMax}%</span>`,
+    `<span class="badge">🌫 습도 ${w.rehAvg}%</span>`,
+    `<span class="badge">🍃 바람 최대 ${w.wsdMax}m/s</span>`,
+    `<span class="badge">🌡 최저 ${w.tMin}°C</span>`
+  ].join("");
+
+  $("wxHead").innerHTML = "<th>구분</th>"+w.rows.map(r=>`<th>${+r.t.slice(0,2)}시</th>`).join("");
+  const rowHTML=(label,fn,hlFn)=>`<tr><th>${label}</th>`+w.rows.map(r=>`<td class="${hlFn&&hlFn(r)?"hl":""}">${fn(r)}</td>`).join("")+"</tr>";
+  $("wxBody").innerHTML =
+    rowHTML("하늘",r=>r.pty>0?(PTY_EM[r.pty]||"🌧"):(SKY_EM[r.sky]||"☀️")) +
+    rowHTML("기온(°C)",r=>r.tmp, r=>r.tmp===w.tMax) +
+    rowHTML("강수확률(%)",r=>r.pop, r=>r.pop>=60) +
+    rowHTML("습도(%)",r=>r.reh) +
+    rowHTML("풍속(m/s)",r=>r.wsd);
+  $("wxNote").innerHTML = rainy
+    ? "<b>요약</b> · 강수 가능성이 높아 실내 활동 위주로 계획하고, 외출 시 우산을 챙기세요."
+    : w.tMax>=30 ? "<b>요약</b> · 강수 걱정은 없지만 한낮은 더워요. <b>늦은 오후~저녁</b>이 야외 활동 골든타임이에요."
+    : "<b>요약</b> · 무난한 날씨예요. 야외 활동을 편하게 계획해도 좋아요.";
+
+  const svg=$("tempChart"); const rows=w.rows;
+  const W=720,L=50,R2=690;
+  const xs=rows.map((_,i)=>rows.length===1?W/2:L+(R2-L)*i/(rows.length-1));
+  const tmin=Math.min(...rows.map(r=>r.tmp)), tmax=Math.max(...rows.map(r=>r.tmp));
+  const y=t=> tmax===tmin?100 : 150-(t-tmin)/(tmax-tmin)*95;
+  const pts=rows.map((r,i)=>`${xs[i]},${y(r.tmp)}`).join(" ");
+  const area=`${pts} ${xs[xs.length-1]},168 ${xs[0]},168`;
+  let g=`<defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#FFC845" stop-opacity=".55"/><stop offset="100%" stop-color="#FFC845" stop-opacity="0"/></linearGradient></defs>`;
+  g+=`<polyline fill="url(#tg)" stroke="none" points="${area}"/>`;
+  g+=`<polyline fill="none" stroke="#1C8CA8" stroke-width="3.5" stroke-linecap="round" points="${pts}"/>`;
+  let peakDone=false;
+  rows.forEach((r,i)=>{
+    const peak=!peakDone&&r.tmp===tmax; if(peak)peakDone=true;
+    g+=`<circle cx="${xs[i]}" cy="${y(r.tmp)}" r="${peak?7:5}" fill="${peak?"#FFC845":"#1C8CA8"}" ${peak?'stroke="#0E4C6D" stroke-width="2"':''}/>`;
+    g+=`<text x="${xs[i]}" y="${y(r.tmp)-13}" text-anchor="middle" font-size="13" fill="#0E4C6D" font-family="Jua">${r.tmp}°${peak?" 최고":""}</text>`;
+    g+=`<text x="${xs[i]}" y="186" text-anchor="middle" font-size="12" fill="#6E8CA0" font-family="Gowun Dodum">${+r.t.slice(0,2)}시</text>`;
+  });
+  svg.innerHTML=g;
+}
+
+const GROUP_META={
+  outSport:{title:"🏃‍♀️ 나가서 운동해요",tag:"야외 운동"},
+  outPlay:{title:"🧺 밖에서 놀아요",tag:"야외 나들이"},
+  inSport:{title:"💪 운동은 못 참지, 실내 운동",tag:"실내 운동"},
+  inFun:{title:"🎬 실내에서 즐겨요",tag:"실내 여가"},
+  home:{title:"🏠 집밖은 위험해",tag:"집콕"}
+};
+/* 그룹별 귀여운 아트 (카와이 SVG) */
+const GROUP_ART={
+  outSport:`<svg viewBox="0 0 220 120"><circle cx="180" cy="26" r="16" fill="#FFC845"/><g stroke="#FFC845" stroke-width="3" stroke-linecap="round"><line x1="180" y1="2" x2="180" y2="8"/><line x1="204" y1="26" x2="210" y2="26"/><line x1="197" y1="9" x2="201" y2="5"/></g>
+  <path d="M50 78 q6 -26 34 -26 h44 q22 0 26 16 q2 10 -8 12 h-88 q-10 0 -8 -2z" fill="#7FC6DB"/>
+  <path d="M50 78 h104 q8 0 8 8 q0 8 -8 8 h-104 q-8 0 -8 -8 q0 -8 8 -8z" fill="#0E4C6D"/>
+  <path d="M84 52 l8 14 M104 52 l8 14 M124 52 l8 14" stroke="#EAF6FB" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="86" cy="72" r="3.5" fill="#12303F"/><circle cx="104" cy="72" r="3.5" fill="#12303F"/>
+  <path d="M88 80 q7 5 14 0" stroke="#12303F" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="76" cy="78" r="4" fill="#FF9E9E" opacity=".7"/><circle cx="114" cy="78" r="4" fill="#FF9E9E" opacity=".7"/>
+  <g stroke="#1C8CA8" stroke-width="3.5" stroke-linecap="round"><line x1="18" y1="66" x2="34" y2="66"/><line x1="12" y1="78" x2="30" y2="78"/><line x1="20" y1="90" x2="34" y2="90"/></g></svg>`,
+  outPlay:`<svg viewBox="0 0 220 120"><circle cx="42" cy="26" r="15" fill="#FFC845"/><g stroke="#FFC845" stroke-width="3" stroke-linecap="round"><line x1="42" y1="4" x2="42" y2="9"/><line x1="64" y1="26" x2="69" y2="26"/><line x1="58" y1="10" x2="62" y2="6"/></g>
+  <path d="M70 60 h80 l-8 40 h-64 z" fill="#E2A96B"/>
+  <path d="M70 60 h80 l-2 10 h-76 z" fill="#C98B4B"/>
+  <path d="M85 60 q25 -34 50 0" fill="none" stroke="#C98B4B" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="100" cy="80" r="3.5" fill="#5B3A1E"/><circle cx="120" cy="80" r="3.5" fill="#5B3A1E"/>
+  <path d="M102 89 q8 6 16 0" stroke="#5B3A1E" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="91" cy="87" r="4" fill="#FF9E9E" opacity=".7"/><circle cx="129" cy="87" r="4" fill="#FF9E9E" opacity=".7"/>
+  <ellipse cx="176" cy="104" rx="30" ry="8" fill="#8FCB9B" opacity=".8"/><ellipse cx="42" cy="106" rx="26" ry="7" fill="#8FCB9B" opacity=".8"/></svg>`,
+  inSport:`<svg viewBox="0 0 220 120">
+  <rect x="30" y="42" width="20" height="40" rx="7" fill="#0E4C6D"/><rect x="170" y="42" width="20" height="40" rx="7" fill="#0E4C6D"/>
+  <rect x="52" y="50" width="14" height="24" rx="5" fill="#1C8CA8"/><rect x="154" y="50" width="14" height="24" rx="5" fill="#1C8CA8"/>
+  <rect x="66" y="56" width="88" height="12" rx="6" fill="#7FC6DB"/>
+  <circle cx="100" cy="62" r="2.8" fill="#12303F"/><circle cx="120" cy="62" r="2.8" fill="#12303F"/>
+  <path d="M103 66 q7 4 14 0" stroke="#12303F" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <g stroke="#FFC845" stroke-width="3" stroke-linecap="round"><line x1="96" y1="36" x2="92" y2="28"/><line x1="110" y1="34" x2="110" y2="25"/><line x1="124" y1="36" x2="128" y2="28"/></g>
+  <path d="M60 96 q50 14 100 0" stroke="#DCE7EC" stroke-width="4" fill="none" stroke-linecap="round"/></svg>`,
+  inFun:`<svg viewBox="0 0 220 120">
+  <path d="M78 44 h64 l-8 60 h-48 z" fill="#F05A5A"/>
+  <path d="M84 44 h8 l-5 60 h-8z M116 44 h8 l-2 60 h-8z" fill="#FFF4F4" opacity=".85"/>
+  <circle cx="98" cy="72" r="3.5" fill="#5B1E1E"/><circle cx="122" cy="72" r="3.5" fill="#5B1E1E"/>
+  <path d="M101 82 q9 6 18 0" stroke="#5B1E1E" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g fill="#FFE9AE" stroke="#E8C56B" stroke-width="1.5">
+    <circle cx="88" cy="38" r="9"/><circle cx="104" cy="32" r="10"/><circle cx="122" cy="34" r="9"/><circle cx="134" cy="42" r="8"/>
+  </g>
+  <g fill="#FFC845"><path d="M52 60 l3 7 7 1 -5 5 1 7 -6 -3 -6 3 1 -7 -5 -5 7 -1z"/><path d="M168 52 l2.4 5.6 5.6 .8 -4 4 .8 5.6 -4.8 -2.4 -4.8 2.4 .8 -5.6 -4 -4 5.6 -.8z"/></g></svg>`,
+  home:`<svg viewBox="0 0 220 120">
+  <path d="M110 26 L60 62 h14 v40 h72 v-40 h14 z" fill="#F2B36B"/>
+  <path d="M110 26 L60 62 h14 l36 -26 36 26 h14 z" fill="#D98E3B"/>
+  <rect x="98" y="76" width="24" height="26" rx="4" fill="#8A5A2B"/>
+  <circle cx="94" cy="70" r="3.5" fill="#5B3A1E"/><circle cx="126" cy="70" r="3.5" fill="#5B3A1E"/>
+  <path d="M100 78 q10 -6 20 0" stroke="#5B3A1E" stroke-width="3" fill="none" stroke-linecap="round" transform="translate(0,2)"/>
+  <circle cx="86" cy="78" r="4" fill="#FF9E9E" opacity=".7"/><circle cx="134" cy="78" r="4" fill="#FF9E9E" opacity=".7"/>
+  <g font-family="Jua" fill="#1C8CA8"><text x="152" y="36" font-size="18">z</text><text x="164" y="26" font-size="14">z</text><text x="174" y="18" font-size="11">z</text></g>
+  <ellipse cx="110" cy="108" rx="58" ry="6" fill="#DCE7EC" opacity=".8"/></svg>`
+};
+
+function renderActivities(w, ampm){
+  const acts=scoreActivities(w, ampm);
+  const pref=(w.rain||w.popMax>=60||w.tMax>=33||w.tMax<=0)?"실내":(w.popMax>=40||w.tMax>=30||w.wsdMax>=8)?"혼합":"실외";
+  $("actSub").textContent = pref==="실내" ? "오늘 날씨엔 실내 활동을 우선 추천해요."
+    : pref==="혼합" ? "실내를 중심으로, 시간대만 잘 고르면 야외도 좋아요."
+    : "야외 활동에 딱 좋은 조건이에요.";
+
+  // TOP3: 별점 높은 순, 서로 다른 그룹에서 하나씩 우선 선발
+  const sorted=acts.slice().sort((a,b)=>b.stars-a.stars);
+  const top=[]; const used=new Set();
+  for(const a of sorted){ if(top.length>=3)break; if(used.has(a.group))continue; used.add(a.group); top.push(a); }
+  for(const a of sorted){ if(top.length>=3)break; if(!top.includes(a)) top.push(a); }
+
+  $("actCards").innerHTML = top.map(a=>`
+    <article class="act">
+      <div class="art" style="background:${a.art}">${GROUP_ART[a.group]||a.emoji}</div>
+      <div class="body">
+        <span class="act-tag">${GROUP_META[a.group].title}</span>
+        <h3>${a.emoji} ${a.name}</h3>
+        <div class="stars">${starHTML(a.stars)}</div>
+        <ul class="why">${a.reasons.map(r=>`<li>${r}</li>`).join("")}</ul>
+      </div>
+    </article>`).join("");
+
+  // 그룹별 체크리스트: 별점 높은 순 3개만 기본 표시, 나머지는 더보기
+  const order=["outSport","outPlay","inSport","inFun","home"];
+  $("actChecklist").innerHTML = order.map(gr=>{
+    const meta=GROUP_META[gr];
+    const list=acts.filter(a=>a.group===gr).sort((a,b)=>b.stars-a.stars);
+    const chip=(a,hide)=>{
+      const ok=a.stars>=3;
+      return `<span class="ck ${ok?"ok":"no"}${hide?" hidden":""}" title="${a.reasons.join(" · ")}">
+        <b>${ok?"✔":"✖"}</b><span class="lbl">${a.emoji} ${a.name}</span><span class="st">${"★".repeat(a.stars)}</span></span>`;
+    };
+    const shown=list.slice(0,3).map(a=>chip(a,false)).join("");
+    const hidden=list.slice(3).map(a=>chip(a,true)).join("");
+    const moreBtn=list.length>3?`<button type="button" class="more-btn" onclick="toggleMore(this)">+ ${list.length-3}개 더보기</button>`:"";
+    return `<div class="ck-group">
+      <div class="ck-title">${meta.title}<span class="tag">${meta.tag}</span></div>
+      <div class="checklist">${shown}${hidden}${moreBtn}</div>
+    </div>`;
+  }).join("");
+}
+function toggleMore(btn){
+  const open=btn.classList.toggle("open");
+  btn.parentElement.querySelectorAll(".ck.hidden, .ck.was-hidden").forEach(c=>{
+    c.classList.toggle("hidden");
+    c.classList.add("was-hidden");
+  });
+  btn.textContent = open ? "− 접기" : "+ 더보기";
+}
+
+let map=null, layerG=null;
+/* ---------- OOTD: SVG 파츠 (viewBox 200x224) ---------- */
+const ART={
+  /* 상의 */
+  shirt:(f,s)=>`<path d="M68 38 L56 54 L48 76 L60 82 L68 64 L68 120 L132 120 L132 64 L140 82 L152 76 L144 54 L132 38 Q100 50 68 38Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M100 40 L100 118" stroke="${s}" stroke-width="1.5" opacity=".7"/><circle cx="100" cy="70" r="1.6" fill="${s}"/><circle cx="100" cy="90" r="1.6" fill="${s}"/><circle cx="100" cy="110" r="1.6" fill="${s}"/>`,
+  tee:(f,s)=>`<path d="M68 40 L56 56 L48 78 L60 84 L68 66 L68 120 L132 120 L132 66 L140 84 L152 78 L144 56 L132 40 Q100 52 68 40Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M86 42 Q100 51 114 42" fill="none" stroke="${s}" stroke-width="1.8"/>`,
+  puff:(f,s)=>`<path d="M72 44 Q56 48 52 68 Q50 82 62 84 Q66 70 72 66 L72 118 L128 118 L128 66 Q134 70 138 84 Q150 82 148 68 Q144 48 128 44 Q100 58 72 44Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M84 46 Q100 56 116 46" fill="none" stroke="${s}" stroke-width="2"/>`,
+  over:(f,s,txt)=>`<path d="M62 52 L48 72 L40 96 L54 102 L62 82 L62 132 L138 132 L138 82 L146 102 L160 96 L152 72 L138 52 Q100 66 62 52Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/>`+(txt?`<text x="100" y="106" font-size="15" fill="${s}" text-anchor="middle" font-family="Jua, sans-serif">${txt}</text>`:``),
+  knit:(f,s)=>`<path d="M66 42 L50 60 L42 100 L56 106 L64 78 L64 124 L136 124 L136 78 L144 106 L158 100 L150 60 L134 42 Q100 54 66 42Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M78 60 L78 120 M100 56 L100 124 M122 60 L122 120" stroke="${s}" stroke-width="1.3" opacity=".55"/>`,
+  hood:(f,s)=>`<path d="M64 50 L48 70 L40 98 L54 104 L62 84 L62 134 L138 134 L138 84 L146 104 L160 98 L152 70 L136 50 Q100 64 64 50Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M78 50 Q100 74 122 50" fill="${s}" opacity=".3"/><path d="M92 80 L92 100 M108 80 L108 100" stroke="${s}" stroke-width="2"/>`,
+  /* 긴 아우터 (밑단 y=176) */
+  trench:(f,s)=>`<path d="M66 40 L52 62 L46 100 L60 106 L66 82 L66 176 L134 176 L134 82 L140 106 L154 100 L148 62 L134 40 L100 52Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M100 52 L100 176" stroke="${s}" stroke-width="2"/><rect x="66" y="116" width="68" height="9" fill="${s}"/><rect x="96" y="116" width="9" height="9" fill="#8A6E42"/>`,
+  coat:(f,s)=>`<path d="M66 40 L52 62 L46 102 L60 108 L66 84 L66 176 L134 176 L134 84 L140 108 L154 102 L148 62 L134 40 L100 52Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M100 52 L100 176" stroke="${s}" stroke-width="1.8"/><circle cx="92" cy="96" r="2.4" fill="${s}"/><circle cx="92" cy="122" r="2.4" fill="${s}"/><circle cx="92" cy="148" r="2.4" fill="${s}"/>`,
+  padding:(f,s)=>`<path d="M62 44 L46 64 L40 106 L56 112 L62 86 L62 176 L138 176 L138 86 L144 112 L160 106 L154 64 L138 44 Q100 58 62 44Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M62 72 L138 72 M62 94 L138 94 M62 116 L138 116 M62 138 L138 138 M62 158 L138 158" stroke="${s}" stroke-width="1.5" opacity=".5"/>`,
+  /* 하의 */
+  wide:(f,s)=>`<path d="M72 122 L66 200 L94 200 L99 142 L101 142 L106 200 L134 200 L128 122Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/>`,
+  slacks:(f,s)=>`<path d="M74 122 L70 200 L94 200 L99 146 L101 146 L106 200 L130 200 L126 122Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/>`,
+  jeans:(f,s)=>`<path d="M74 124 L70 200 L94 200 L99 148 L101 148 L106 200 L130 200 L126 124Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M84 130 L82 196 M116 130 L118 196" stroke="${s}" stroke-width="1.2" opacity=".5"/>`,
+  cargo:(f,s)=>`<path d="M70 134 L66 178 L92 178 L99 150 L101 150 L108 178 L134 178 L130 134Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><rect x="72" y="150" width="12" height="14" rx="2" fill="${s}" opacity=".65"/><rect x="116" y="150" width="12" height="14" rx="2" fill="${s}" opacity=".65"/>`,
+  shorts:(f,s)=>`<path d="M70 134 L66 178 L92 178 L99 150 L101 150 L108 178 L134 178 L130 134Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/>`,
+  flare:(f,s)=>`<path d="M72 120 L58 172 L142 172 L128 120Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M84 120 L80 172 M100 120 L100 172 M116 120 L120 172" stroke="${s}" stroke-width="1.3" opacity=".55"/>`,
+  longskirt:(f,s)=>`<path d="M72 120 L62 194 L138 194 L128 120Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M88 120 L84 194 M112 120 L116 194" stroke="${s}" stroke-width="1.3" opacity=".5"/>`,
+  /* 다리 */
+  legs:(y1,y2)=>`<path d="M84 ${y1} L82 ${y2} L94 ${y2} L96 ${y1}Z M104 ${y1} L106 ${y2} L118 ${y2} L116 ${y1}Z" fill="#F6E3D2"/>`,
+  legsB:(f)=>`<path d="M80 176 L78 196 L94 196 L98 176Z M102 176 L106 196 L122 196 L120 176Z" fill="${f}"/>`,
+  /* 신발 */
+  sandal:(y)=>`<ellipse cx="80" cy="${y+6}" rx="15" ry="5" fill="#C89B6A"/><ellipse cx="120" cy="${y+6}" rx="15" ry="5" fill="#C89B6A"/><path d="M70 ${y+2} L90 ${y+2} M110 ${y+2} L130 ${y+2}" stroke="#A87C4E" stroke-width="2"/>`,
+  loafer:(y)=>`<path d="M68 ${y} Q66 ${y+10} 84 ${y+10} L94 ${y+10} L94 ${y}Z" fill="#5A3E2B" stroke="#3E2A1C" stroke-width="1.8"/><path d="M106 ${y} L106 ${y+10} L116 ${y+10} Q134 ${y+10} 132 ${y}Z" fill="#5A3E2B" stroke="#3E2A1C" stroke-width="1.8"/>`,
+  maryjane:(y)=>`<path d="M76 ${y} Q74 ${y+10} 92 ${y+10} L96 ${y+10} L96 ${y}Z" fill="#E58AA6" stroke="#C86A88" stroke-width="1.7"/><path d="M104 ${y} L104 ${y+10} L108 ${y+10} Q126 ${y+10} 124 ${y}Z" fill="#E58AA6" stroke="#C86A88" stroke-width="1.7"/><path d="M82 ${y+3} L92 ${y+3} M108 ${y+3} L118 ${y+3}" stroke="#C86A88" stroke-width="1.6"/>`,
+  chunky:(y)=>`<path d="M64 ${y} L60 ${y+16} Q60 ${y+22} 68 ${y+22} L96 ${y+22} L96 ${y+10} L80 ${y}Z" fill="#FFFFFF" stroke="#9FB0A8" stroke-width="2"/><path d="M104 ${y} L104 ${y+22} L132 ${y+22} Q140 ${y+22} 140 ${y+16} L136 ${y}Z" fill="#FFFFFF" stroke="#9FB0A8" stroke-width="2"/><path d="M60 ${y+17} L96 ${y+17} M104 ${y+17} L140 ${y+17}" stroke="#3AB795" stroke-width="2.4"/>`,
+  sneaker:(y)=>`<path d="M68 ${y} L64 ${y+12} Q64 ${y+16} 72 ${y+16} L96 ${y+16} L96 ${y}Z" fill="#F7F7F5" stroke="#B9C0C6" stroke-width="1.9"/><path d="M104 ${y} L104 ${y+16} L128 ${y+16} Q136 ${y+16} 136 ${y+12} L132 ${y}Z" fill="#F7F7F5" stroke="#B9C0C6" stroke-width="1.9"/><path d="M64 ${y+12} L96 ${y+12} M104 ${y+12} L136 ${y+12}" stroke="#B9C0C6" stroke-width="2"/>`,
+  boots:(y)=>`<path d="M74 ${y-14} L72 ${y+8} L96 ${y+8} L96 ${y-14}Z" fill="#2B2320" stroke="#171210" stroke-width="1.8"/><path d="M104 ${y-14} L104 ${y+8} L128 ${y+8} L126 ${y-14}Z" fill="#2B2320" stroke="#171210" stroke-width="1.8"/>`,
+  rainboots:(y)=>`<path d="M74 ${y-20} L72 ${y+8} L96 ${y+8} L96 ${y-20}Z" fill="#3F7EA8" stroke="#2A5C7E" stroke-width="1.8"/><path d="M104 ${y-20} L104 ${y+8} L128 ${y+8} L126 ${y-20}Z" fill="#3F7EA8" stroke="#2A5C7E" stroke-width="1.8"/><path d="M72 ${y} L96 ${y} M104 ${y} L128 ${y}" stroke="#2A5C7E" stroke-width="1.6"/>`,
+  /* 액세서리 */
+  tote:(f,s)=>`<rect x="150" y="118" width="26" height="30" rx="3" fill="${f}" stroke="${s}" stroke-width="2"/><path d="M155 118 L155 110 Q163 104 171 110 L171 118" fill="none" stroke="${s}" stroke-width="2.2"/>`,
+  shoulder:(f,s)=>`<rect x="150" y="118" width="26" height="22" rx="6" fill="${f}" stroke="${s}" stroke-width="2"/><path d="M150 124 Q140 114 150 106" fill="none" stroke="${s}" stroke-width="2.2"/>`,
+  cross:(f,s)=>`<rect x="149" y="122" width="28" height="20" rx="4" fill="${f}" stroke="${s}" stroke-width="2"/><path d="M149 128 L137 144" stroke="${s}" stroke-width="2.4"/>`,
+  bucket:(f,s)=>`<ellipse cx="100" cy="34" rx="30" ry="7" fill="${s}"/><path d="M78 34 Q80 16 100 16 Q120 16 122 34Z" fill="${f}" stroke="${s}" stroke-width="2"/>`,
+  beanie:(f,s)=>`<path d="M76 34 Q78 12 100 12 Q122 12 124 34Z" fill="${f}" stroke="${s}" stroke-width="2"/><rect x="74" y="31" width="52" height="8" rx="4" fill="${s}"/>`,
+  cap:(f,s)=>`<path d="M78 32 Q80 14 100 14 Q120 14 122 32Z" fill="${f}" stroke="${s}" stroke-width="2"/><path d="M122 32 Q141 32 143 38 L120 38Z" fill="${s}"/>`,
+  muffler:(f,s)=>`<path d="M78 46 Q100 60 122 46 L124 57 Q100 71 76 57Z" fill="${f}" stroke="${s}" stroke-width="1.8"/><path d="M117 57 L123 86 L133 84 L127 55Z" fill="${f}" stroke="${s}" stroke-width="1.8"/>`,
+  umbrella:(f,s)=>`<path d="M148 160 Q164 144 180 160Z" fill="${f}" stroke="${s}" stroke-width="2"/><path d="M164 160 L164 190 q0 7 7 7" fill="none" stroke="#5E7C8C" stroke-width="2.4"/>`,
+  sleeveless:(f,s)=>`<path d="M80 46 L74 64 L70 122 L130 122 L126 64 L120 46 Q100 58 80 46Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M85 47 L89 33 M115 47 L111 33" stroke="${s}" stroke-width="3" stroke-linecap="round"/>`,
+  dress:(f,s)=>`<path d="M74 44 Q58 48 54 68 Q52 80 64 82 Q68 70 74 66 L64 168 L136 168 L126 66 Q132 70 136 82 Q148 80 146 68 Q142 48 126 44 Q100 58 74 44Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M84 46 Q100 56 116 46" fill="none" stroke="${s}" stroke-width="2"/><path d="M70 120 L130 120" stroke="${s}" stroke-width="1.5" opacity=".5"/>`,
+  blouson:(f,s)=>`<path d="M64 44 L48 64 L40 98 L54 104 L62 82 L62 128 L138 128 L138 82 L146 104 L160 98 L152 64 L136 44 L118 52 L100 60 L82 52Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><rect x="62" y="119" width="76" height="9" rx="2" fill="${s}"/><path d="M100 60 L100 119" stroke="${s}" stroke-width="1.8"/>`,
+  vest:(f,s)=>`<path d="M76 46 L68 66 L68 124 L132 124 L132 66 L124 46 L112 52 L100 74 L88 52Z" fill="${f}" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/><path d="M80 72 L80 120 M100 78 L100 122 M120 72 L120 120" stroke="${s}" stroke-width="1.3" opacity=".5"/>`,
+  mule:(y)=>`<path d="M70 ${y} L68 ${y+9} L94 ${y+9} L94 ${y}Z" fill="#D9C4A8" stroke="#B9A184" stroke-width="1.7"/><path d="M106 ${y} L106 ${y+9} L132 ${y+9} L130 ${y}Z" fill="#D9C4A8" stroke="#B9A184" stroke-width="1.7"/>`,
+  heel:(y)=>`<path d="M74 ${y} L72 ${y+8} L96 ${y+8} L96 ${y}Z" fill="#E8B7C6" stroke="#D094A6" stroke-width="1.6"/><rect x="88" y="${y+8}" width="5" height="8" fill="#D094A6"/><path d="M104 ${y} L104 ${y+8} L128 ${y+8} L126 ${y}Z" fill="#E8B7C6" stroke="#D094A6" stroke-width="1.6"/><rect x="107" y="${y+8}" width="5" height="8" fill="#D094A6"/>`,
+  backpack:(f,s)=>`<rect x="150" y="118" width="28" height="32" rx="7" fill="${f}" stroke="${s}" stroke-width="2"/><rect x="157" y="128" width="15" height="12" rx="3" fill="${s}" opacity=".55"/><path d="M154 118 Q149 109 158 107" fill="none" stroke="${s}" stroke-width="2"/>`,
+  bucketbag:(f,s)=>`<path d="M152 122 L156 148 L174 148 L178 122Z" fill="${f}" stroke="${s}" stroke-width="2" stroke-linejoin="round"/><path d="M156 122 Q165 111 174 122" fill="none" stroke="${s}" stroke-width="2.2"/>`,
+  /* 배경 효과 */
+  rainfx:()=>`<g fill="#88A0B2" opacity=".5"><path d="M26 46 q4 8 0 12 q-4-4 0-12"/><path d="M176 66 q4 8 0 12 q-4-4 0-12"/><path d="M18 120 q4 8 0 12 q-4-4 0-12"/><path d="M184 134 q4 8 0 12 q-4-4 0-12"/></g>`,
+  snowfx:()=>`<g fill="#CFE3EE" opacity=".9"><circle cx="26" cy="52" r="4"/><circle cx="176" cy="72" r="4"/><circle cx="20" cy="122" r="3.4"/><circle cx="184" cy="138" r="3.4"/></g>`,
+  sunfx:()=>`<circle cx="28" cy="40" r="13" fill="#FFD86B" opacity=".8"/>`,
+};
+
+/* ---------- OOTD: 무드 & 기온대별 코디 ---------- */
+const OOTD_MOODS=[{key:"min",name:"미니멀",en:"MINIMAL"},{key:"lov",name:"러블리",en:"LOVELY"},{key:"str",name:"스트릿",en:"STREET"}];
+const BAND_LB={hot:"무더운",warm:"따뜻한",mild:"선선한",cold:"쌀쌀한",freeze:"추운"};
+function ootdBand(t){ return t>=28?"hot":t>=23?"warm":t>=17?"mild":t>=10?"cold":"freeze"; }
+
+const OOTD_SETS={
+ hot:{
+  min:[
+   {t:"클린 모노톤",c:"군더더기 없는 무채색 룩",bg:["#EDEFF1","#DCE0E4"],
+    i:[["상의","아이보리 반팔 셔츠"],["하의","차콜 크롭 슬랙스"],["신발","방수 로퍼"],["포인트","미니 토트백"]],
+    g:["#무채색","#깔끔","#젠더리스"],p:"얇은 셔츠로 통기성을 살리고, 크롭 기장이라 밑단 젖을 걱정도 적어요.",
+    a:()=>ART.shirt("#F4F5F6","#B9C0C6")+ART.slacks("#5B6670","#414A52")+ART.loafer(200)+ART.tote("#8A9299","#6B747B")},
+   {t:"쿨 그레이 셋업",c:"톤 맞춘 시원한 회색조",bg:["#EFF1F2","#DDE1E4"],
+    i:[["상의","라이트 그레이 반팔 티"],["하의","그레이 와이드 팬츠"],["신발","화이트 스니커즈"],["포인트","레더 토트백"]],
+    g:["#그레이톤","#와이드","#심플"],p:"헐렁한 와이드 핏이라 땀이 차도 몸에 붙지 않아요.",
+    a:()=>ART.tee("#E9ECEE","#C2C8CC")+ART.wide("#8A9299","#6B747B")+ART.sneaker(200)+ART.tote("#5B6670","#414A52")},
+   {t:"화이트 슬리브리스",c:"가장 시원한 올화이트",bg:["#F4F6F7","#E2E6E9"],
+    i:[["상의","화이트 슬리브리스"],["하의","라이트 그레이 롱스커트"],["신발","뮬 샌들"],["포인트","버킷백"]],
+    g:["#올화이트","#슬리브리스","#여름"],p:"민소매에 통기성 좋은 롱스커트면 한여름에도 버틸 만해요.",
+    a:()=>ART.sleeveless("#FCFCFB","#D2D6D9")+ART.longskirt("#E4E7E9","#BFC5C9")+ART.mule(194)+ART.bucketbag("#B9C0C6","#98A1A8")}
+  ],
+  lov:[
+   {t:"페미닌 파스텔",c:"사랑스러운 핑크 무드",bg:["#FCEAF0","#F8D9E4"],
+    i:[["상의","퍼프소매 블라우스"],["하의","플레어 미니 스커트"],["신발","메리제인"],["포인트","미니 숄더백"]],
+    g:["#파스텔","#퍼프소매","#러블리"],p:"짧은 기장에 얇은 소재라 시원하고, 활동할 때도 편해요.",
+    a:()=>ART.puff("#FBF3F6","#E9B9C9")+ART.flare("#F4A9C0","#DE7B9B")+ART.legs(172,194)+ART.maryjane(194)+ART.shoulder("#F19FB8","#DE7B9B")},
+   {t:"원피스 한 벌",c:"고민 없이 툭 걸치는 원피스",bg:["#FDEDF2","#F7DCE6"],
+    i:[["원피스","플로럴 반팔 원피스"],["신발","로우힐"],["포인트","미니 숄더백"],["추천","얇은 가디건 한 장"]],
+    g:["#원피스","#플로럴","#데이트룩"],p:"한 벌로 끝나서 아침에 고민할 필요가 없어요. 실내 냉방 대비로 가디건 하나만 챙기세요.",
+    a:()=>ART.dress("#FBEAF0","#E9B9C9")+ART.legs(168,192)+ART.heel(192)+ART.shoulder("#F19FB8","#DE7B9B")},
+   {t:"코튼 캐미솔",c:"보드라운 크림 & 라일락",bg:["#FBF3EC","#F2E4F0"],
+    i:[["상의","코튼 캐미솔"],["하의","라일락 플레어 스커트"],["신발","메리제인"],["포인트","버킷백"]],
+    g:["#라일락","#캐미솔","#여리여리"],p:"땀 흡수 잘 되는 면 소재라 습한 날에도 끈적임이 덜해요.",
+    a:()=>ART.sleeveless("#FFF8F0","#E8D3C8")+ART.flare("#DCC7E8","#BFA3D0")+ART.legs(172,194)+ART.maryjane(194)+ART.bucketbag("#E8C9D8","#CFA3B8")}
+  ],
+  str:[
+   {t:"나일론 스트릿",c:"더위도 쿨하게, 힙한 무드",bg:["#DDF0EA","#C4E5DA"],
+    i:[["상의","오버핏 그래픽 티셔츠"],["하의","나일론 카고 쇼츠"],["신발","청키 스니커즈"],["포인트","버킷햇 · 크로스백"]],
+    g:["#Y2K","#카고","#버킷햇"],p:"젖어도 금방 마르는 나일론 소재가 최고. 버킷햇이 햇빛도 비도 막아줘요.",
+    a:()=>ART.bucket("#3AB795","#238067")+ART.over("#F2C14E","#D19B2A","VIBE")+ART.cargo("#4A5A50","#33423A")+ART.legs(178,196)+ART.chunky(196)+ART.cross("#238067","#17604C")},
+   {t:"화이트 앤 카키",c:"깔끔하게 떨어지는 스트릿",bg:["#E8F0EA","#D2E3D6"],
+    i:[["상의","화이트 오버핏 티"],["하의","카키 카고 쇼츠"],["신발","스니커즈"],["포인트","볼캡 · 백팩"]],
+    g:["#카키","#볼캡","#캐주얼"],p:"밝은 상의라 햇빛 흡수가 적어 체감이 덜 더워요.",
+    a:()=>ART.cap("#2F5D52","#1D4139")+ART.tee("#FBFBF9","#CFD6D2")+ART.cargo("#7A8C6E","#5C6B53")+ART.legs(178,196)+ART.sneaker(196)+ART.backpack("#3AA98C","#238067")},
+   {t:"저지 셋업",c:"어두운 톤으로 무게감 있게",bg:["#E1EAEF","#C8DBE4"],
+    i:[["상의","오버핏 저지 티"],["하의","블랙 나일론 쇼츠"],["신발","청키 스니커즈"],["포인트","버킷햇 · 크로스백"]],
+    g:["#저지","#스포티","#블랙"],p:"기능성 저지 소재는 땀이 나도 금방 말라서 더운 날 활동에 좋아요.",
+    a:()=>ART.bucket("#4E6E86","#33505F")+ART.over("#4E6E86","#33505F","NY")+ART.shorts("#2E3A42","#1C262C")+ART.legs(178,196)+ART.chunky(196)+ART.cross("#2E3A42","#1C262C")}
+  ]
+ },
+ warm:{
+  min:[
+   {t:"뉴트럴 데일리",c:"편안한 베이지 톤 정리",bg:["#F2F0EA","#E2DED3"],
+    i:[["상의","베이지 반팔 티"],["하의","아이보리 와이드 팬츠"],["신발","화이트 스니커즈"],["포인트","캔버스 토트백"]],
+    g:["#뉴트럴","#와이드","#데일리"],p:"통기성 좋은 면 소재에 와이드 핏이라 하루 종일 편해요.",
+    a:()=>ART.tee("#E8E2D6","#C3BBA9")+ART.wide("#F0EDE4","#C9C2B4")+ART.sneaker(200)+ART.tote("#C9BFA8","#A79A80")},
+   {t:"소프트 셔츠 룩",c:"단정하게 떨어지는 실루엣",bg:["#EFF2F4","#DDE3E7"],
+    i:[["상의","라이트 블루 셔츠"],["하의","그레이 슬랙스"],["신발","로퍼"],["포인트","레더 토트백"]],
+    g:["#셔츠","#오피스캐주얼","#단정"],p:"이 기온엔 얇은 셔츠 한 장이 딱. 소매 걷으면 더 시원해요.",
+    a:()=>ART.shirt("#EDF1F3","#C2CACF")+ART.slacks("#8A9299","#6B747B")+ART.loafer(200)+ART.tote("#A79A80","#867A62")},
+   {t:"니트 베스트",c:"레이어드로 만든 포인트",bg:["#F3F1E9","#E5E0D0"],
+    i:[["상의","화이트 셔츠 + 니트 베스트"],["하의","아이보리 와이드 팬츠"],["신발","스니커즈"],["포인트","버킷백"]],
+    g:["#니트베스트","#레이어드","#뉴트럴"],p:"베스트만 벗으면 온도 조절이 되니 일교차 있는 날에 좋아요.",
+    a:()=>ART.shirt("#FBFBF9","#D5DADD")+ART.vest("#D8CDB8","#B5A98F")+ART.wide("#EFEDE6","#C9C4B4")+ART.sneaker(200)+ART.bucketbag("#B5A98F","#948970")}
+  ],
+  lov:[
+   {t:"로맨틱 미디",c:"살랑이는 미디 스커트 룩",bg:["#FDF0F4","#F7DFE8"],
+    i:[["상의","퍼프소매 블라우스"],["하의","플로럴 미디 스커트"],["신발","메리제인"],["포인트","레이스 숄더백"]],
+    g:["#미디스커트","#플로럴","#데이트룩"],p:"기온이 딱 좋아서 얇은 블라우스 하나로 충분해요.",
+    a:()=>ART.puff("#FFF7FA","#EFC8D6")+ART.longskirt("#F6C6D6","#DE9CB4")+ART.maryjane(194)+ART.shoulder("#F4B8CC","#DE9CB4")},
+   {t:"블루 플레어",c:"산뜻한 하늘빛 조합",bg:["#F6F3EC","#E4EFF6"],
+    i:[["상의","크림 리본 블라우스"],["하의","스카이블루 플레어 스커트"],["신발","메리제인"],["포인트","숄더백"]],
+    g:["#스카이블루","#리본","#청순"],p:"밝은 색 조합이 이 계절 햇빛과 잘 어울려요.",
+    a:()=>ART.puff("#FFFDF8","#E5D6C4")+ART.flare("#CFE3F0","#A9C7DC")+ART.legs(172,194)+ART.maryjane(194)+ART.shoulder("#A9C7DC","#87A9C2")},
+   {t:"셔츠 원피스",c:"한 벌로 완성되는 단정함",bg:["#FBF0F3","#F3DFE6"],
+    i:[["원피스","코튼 셔츠 원피스"],["신발","뮬 샌들"],["포인트","버킷백"],["추천","얇은 벨트로 허리 강조"]],
+    g:["#셔츠원피스","#미니멀러블리","#데일리"],p:"벨트 하나로 실루엣이 달라져요. 단추 풀어 가디건처럼 입어도 좋아요.",
+    a:()=>ART.dress("#F7E6EC","#DEB9C8")+ART.legs(168,192)+ART.mule(192)+ART.bucketbag("#E8C9D8","#CFA3B8")}
+  ],
+  str:[
+   {t:"데님 캐주얼",c:"가볍게 툭 걸친 시티 무드",bg:["#E3EFF5","#CBE1EC"],
+    i:[["상의","오버핏 티셔츠"],["하의","데님 쇼츠"],["신발","청키 스니커즈"],["포인트","볼캡 · 크로스백"]],
+    g:["#데님","#오버핏","#시티보이"],p:"활동량 많은 날에 딱. 볼캡으로 자외선도 막아줘요.",
+    a:()=>ART.cap("#4E6E86","#33505F")+ART.over("#7FD4C1","#4BAE96","CITY")+ART.shorts("#6E93B8","#4E7A9B")+ART.legs(178,196)+ART.chunky(196)+ART.cross("#4E6E86","#33505F")},
+   {t:"후디 앤 카고",c:"편한데 힙한 조합",bg:["#E9ECEE","#D4DBDE"],
+    i:[["상의","라이트 그레이 후디"],["하의","올리브 카고 팬츠"],["신발","청키 스니커즈"],["포인트","볼캡 · 크로스백"]],
+    g:["#후디","#카고","#스트릿"],p:"아침저녁 선선할 때 후디 하나면 온도 조절이 쉬워요.",
+    a:()=>ART.hood("#E6E9EB","#BFC6CA")+ART.cargo("#5A6B60","#3E4C44")+ART.legs(178,196)+ART.chunky(196)+ART.cap("#3AA98C","#238067")+ART.cross("#5A6B60","#3E4C44")},
+   {t:"옐로 그래픽",c:"포인트 컬러로 확 살리기",bg:["#F6EFDD","#E7E0C6"],
+    i:[["상의","머스터드 그래픽 티"],["하의","와이드 데님"],["신발","스니커즈"],["포인트","버킷햇 · 백팩"]],
+    g:["#포인트컬러","#와이드데님","#캐주얼"],p:"밝은 상의 하나로 전체 분위기가 확 살아나요.",
+    a:()=>ART.bucket("#8FB0C9","#6A8CA6")+ART.over("#F2C14E","#D19B2A","SUN")+ART.jeans("#8FB0C9","#6A8CA6")+ART.sneaker(200)+ART.backpack("#4E6E86","#33505F")}
+  ]
+ },
+ mild:{
+  min:[
+   {t:"레이어드 셔츠",c:"차분한 톤온톤 정리",bg:["#EAEDEF","#D6DCE0"],
+    i:[["상의","라이트 그레이 셔츠"],["하의","네이비 와이드 슬랙스"],["신발","로퍼"],["포인트","레더 토트백"]],
+    g:["#톤온톤","#미니멀","#오피스캐주얼"],p:"선선해서 셔츠 한 장이면 딱. 얇은 가디건 하나 챙기면 저녁에도 든든해요.",
+    a:()=>ART.shirt("#E8ECEF","#B4BCC2")+ART.wide("#4A5560","#333C45")+ART.loafer(200)+ART.tote("#6B5B4A","#4C4034")},
+   {t:"그레이 니트",c:"부드럽게 감싸는 니트",bg:["#EDEFF1","#D9DEE1"],
+    i:[["상의","그레이 라이트 니트"],["하의","차콜 슬랙스"],["신발","로퍼"],["포인트","레더 토트백"]],
+    g:["#니트","#차콜","#클래식"],p:"얇은 니트는 이 기온대에 가장 무난해요. 안에 이너 하나면 충분.",
+    a:()=>ART.knit("#DCE1E4","#B4BCC2")+ART.slacks("#3E4A54","#2A343C")+ART.loafer(200)+ART.tote("#6B5B4A","#4C4034")},
+   {t:"블루종 레이어드",c:"가볍게 걸치는 겉옷",bg:["#E7EDF1","#D0DBE2"],
+    i:[["아우터","라이트 블루종"],["하의","네이비 와이드 팬츠"],["신발","스니커즈"],["포인트","숄더백"]],
+    g:["#블루종","#레이어드","#캐주얼"],p:"바람 불 때 걸치고 더우면 벗기 좋은 가벼운 겉옷이에요.",
+    a:()=>ART.wide("#4A5560","#333C45")+ART.blouson("#8FA9B8","#5E7C8C")+ART.sneaker(200)+ART.tote("#5E7C8C","#456070")}
+  ],
+  lov:[
+   {t:"니트 카디건",c:"포근한 크림 무드",bg:["#FBF1F1","#F3E0E2"],
+    i:[["상의","크림 니트 가디건"],["하의","롱 플리츠 스커트"],["신발","메리제인"],["포인트","숄더백"]],
+    g:["#니트","#플리츠","#포근"],p:"쌀쌀할 때 걸치고 더우면 벗기 좋은 가디건이 정답이에요.",
+    a:()=>ART.knit("#F7EDE3","#DCC9B6")+ART.longskirt("#E9C8D2","#CFA3B2")+ART.maryjane(194)+ART.shoulder("#D9A7B6","#BE8496")},
+   {t:"니트 원피스",c:"한 벌로 완성되는 포근함",bg:["#F8EEF2","#EEDCE4"],
+    i:[["원피스","니트 원피스"],["신발","메리제인"],["포인트","숄더백"],["추천","얇은 스타킹"]],
+    g:["#니트원피스","#포근","#데이트룩"],p:"니트 한 벌이면 따로 매치할 필요가 없어 아침이 편해요.",
+    a:()=>ART.dress("#EFD9E2","#D0AABB")+ART.legs(168,192)+ART.maryjane(192)+ART.shoulder("#D9A7B6","#BE8496")},
+   {t:"라일락 롱스커트",c:"차분한 보랏빛 무드",bg:["#F7F1F7","#EAE0EE"],
+    i:[["상의","퍼프소매 블라우스"],["하의","라일락 롱스커트"],["신발","메리제인"],["포인트","버킷백"]],
+    g:["#라일락","#롱스커트","#페미닌"],p:"긴 기장이 다리를 덮어줘서 선선한 날에도 춥지 않아요.",
+    a:()=>ART.puff("#FDF3F6","#E5CBD5")+ART.longskirt("#C8B4D2","#A692B4")+ART.maryjane(194)+ART.bucketbag("#A692B4","#877199")}
+  ],
+  str:[
+   {t:"후디 레이어드",c:"편한데 멋있는 스트릿",bg:["#E6EAED","#D0D8DE"],
+    i:[["상의","오버핏 후디"],["하의","와이드 데님"],["신발","스니커즈"],["포인트","볼캡 · 크로스백"]],
+    g:["#후디","#와이드데님","#스트릿"],p:"아침저녁 일교차에 후디 하나면 온도 조절이 쉬워요.",
+    a:()=>ART.cap("#3E4A54","#2A343C")+ART.hood("#7C8A94","#5A6670")+ART.jeans("#6E93B8","#4E7A9B")+ART.sneaker(200)+ART.cross("#3E4A54","#2A343C")},
+   {t:"그린 블루종",c:"포인트 컬러 아우터",bg:["#E3EFEA","#CBE2D8"],
+    i:[["아우터","그린 블루종"],["하의","와이드 데님"],["신발","청키 스니커즈"],["포인트","볼캡 · 크로스백"]],
+    g:["#블루종","#그린","#스트릿"],p:"바람 막아주면서 색으로 포인트까지 잡아주는 아우터예요.",
+    a:()=>ART.jeans("#6E93B8","#4E7A9B")+ART.blouson("#3AA98C","#238067")+ART.chunky(200)+ART.cap("#2E3A42","#1C262C")+ART.cross("#238067","#17604C")},
+   {t:"니트 앤 카고",c:"거친 듯 정리된 무드",bg:["#E7EBEA","#D2DBD8"],
+    i:[["상의","차콜 니트"],["하의","카키 카고 팬츠"],["신발","스니커즈"],["포인트","비니 · 백팩"]],
+    g:["#카고","#비니","#무채색"],p:"니트에 카고 조합은 이 기온대 스트릿의 정석이에요.",
+    a:()=>ART.beanie("#E8734A","#C2542F")+ART.knit("#4E5A62","#333D44")+ART.cargo("#3A4A40","#26332B")+ART.legs(178,196)+ART.sneaker(196)+ART.backpack("#3A4A40","#26332B")}
+  ]
+ },
+ cold:{
+  min:[
+   {t:"베이지 트렌치",c:"클래식한 가을 아우터",bg:["#EFEAE0","#DED6C6"],
+    i:[["아우터","베이지 트렌치코트"],["하의","슬림 슬랙스"],["신발","앵클부츠"],["포인트","레더 토트백"]],
+    g:["#트렌치","#클래식","#미니멀"],p:"바람 막아주면서 무겁지 않아 이 기온에 가장 무난해요.",
+    a:()=>ART.trench("#D8C3A5","#B4915F")+ART.legsB("#3A4650")+ART.boots(196)+ART.tote("#6B5B4A","#4C4034")},
+   {t:"그레이 롱코트",c:"차분하게 떨어지는 기장",bg:["#EBEEF0","#D7DDE1"],
+    i:[["아우터","그레이 울 코트"],["하의","기모 슬랙스"],["신발","앵클부츠"],["포인트","머플러 · 토트백"]],
+    g:["#울코트","#그레이","#클래식"],p:"머플러 하나만 더하면 체감온도가 확 올라가요.",
+    a:()=>ART.coat("#9AA4AB","#78848C")+ART.legsB("#3A4650")+ART.boots(196)+ART.muffler("#D5DADD","#B0B8BD")+ART.tote("#6B5B4A","#4C4034")},
+   {t:"니트 앤 부츠",c:"겉옷 없이 니트 한 장",bg:["#EDEFF1","#DADFE2"],
+    i:[["상의","두께감 있는 니트"],["하의","차콜 와이드 팬츠"],["신발","앵클부츠"],["포인트","머플러 · 토트백"]],
+    g:["#니트","#부츠","#심플"],p:"실내 활동이 많은 날엔 두꺼운 니트 한 장이 오히려 편해요.",
+    a:()=>ART.knit("#E8ECEF","#BFC6CA")+ART.wide("#3E4A54","#2A343C")+ART.boots(200)+ART.muffler("#8A9299","#6B747B")+ART.tote("#4C4034","#33291F")}
+  ],
+  lov:[
+   {t:"파스텔 코트",c:"부드러운 겨울 초입 룩",bg:["#FAEEF1","#F0DCE2"],
+    i:[["아우터","연핑크 울 코트"],["상의","니트 원피스"],["신발","앵클부츠"],["포인트","머플러 · 숄더백"]],
+    g:["#울코트","#파스텔","#러블리"],p:"머플러 하나로 체감온도가 확 올라가요. 목만 따뜻해도 훨씬 덜 추워요.",
+    a:()=>ART.coat("#F3D7DF","#D9A7B6")+ART.legsB("#C9A9B4")+ART.boots(196)+ART.muffler("#F4A9C0","#DE7B9B")+ART.shoulder("#E8B7C6","#D094A6")},
+   {t:"크림 트렌치",c:"가볍고 우아한 겉옷",bg:["#F9F2EE","#EFE2DC"],
+    i:[["아우터","크림 트렌치코트"],["하의","기모 슬랙스"],["신발","앵클부츠"],["포인트","핑크 머플러 · 숄더백"]],
+    g:["#트렌치","#크림톤","#우아"],p:"밝은 코트에 포인트 머플러 하나면 겨울에도 답답해 보이지 않아요.",
+    a:()=>ART.trench("#F0E2E4","#D3BCC0")+ART.legsB("#C9A9B4")+ART.boots(196)+ART.muffler("#F4A9C0","#DE7B9B")+ART.shoulder("#E8B7C6","#D094A6")},
+   {t:"니트 앤 롱스커트",c:"레이어드로 만든 포근함",bg:["#FBF3EE","#F1E1DC"],
+    i:[["상의","크림 두께감 니트"],["하의","핑크 롱스커트"],["신발","롱부츠"],["포인트","숄더백"]],
+    g:["#롱스커트","#니트","#포근"],p:"긴 기장 스커트에 부츠를 신으면 바람이 덜 들어와요.",
+    a:()=>ART.knit("#F7EDE3","#DCC9B6")+ART.longskirt("#E9C8D2","#CFA3B2")+ART.boots(200)+ART.shoulder("#D9A7B6","#BE8496")}
+  ],
+  str:[
+   {t:"비니 앤 데님",c:"레이어드로 쌓은 스트릿",bg:["#E4EBEA","#CCDCD8"],
+    i:[["상의","오버핏 후디"],["하의","와이드 데님"],["신발","청키 스니커즈"],["포인트","비니 · 크로스백"]],
+    g:["#비니","#레이어드","#스트릿"],p:"후디 위에 바람막이 하나 더 걸치면 이 기온도 거뜬해요.",
+    a:()=>ART.beanie("#3AA98C","#238067")+ART.hood("#4E5A62","#333D44")+ART.jeans("#4E6E86","#33505F")+ART.chunky(200)+ART.cross("#238067","#17604C")},
+   {t:"숏패딩 스트릿",c:"가볍게 보온 챙기기",bg:["#E2ECF1","#C9DDE7"],
+    i:[["아우터","네이비 숏패딩"],["하의","기모 조거 팬츠"],["신발","청키 스니커즈"],["포인트","비니 · 크로스백"]],
+    g:["#숏패딩","#조거","#스트릿"],p:"숏패딩은 활동성이 좋아서 많이 걷는 날에 특히 편해요.",
+    a:()=>ART.beanie("#F2C14E","#D19B2A")+ART.padding("#4E6E86","#33505F")+ART.legsB("#2E3740")+ART.chunky(196)+ART.cross("#33505F","#223B47")},
+   {t:"카고 앤 블루종",c:"거친 무드의 레이어드",bg:["#E5EDE9","#CDE0D6"],
+    i:[["아우터","다크그린 블루종"],["하의","카키 카고 팬츠"],["신발","청키 스니커즈"],["포인트","볼캡 · 백팩"]],
+    g:["#카고","#블루종","#밀리터리"],p:"안에 기모 후디를 겹쳐 입으면 보온이 훨씬 좋아져요.",
+    a:()=>ART.cargo("#3A4A40","#26332B")+ART.blouson("#2F5D52","#1D4139")+ART.legs(178,196)+ART.chunky(196)+ART.cap("#E8734A","#C2542F")+ART.backpack("#2F5D52","#1D4139")}
+  ]
+ },
+ freeze:{
+  min:[
+   {t:"차콜 롱코트",c:"묵직하고 단정한 겨울",bg:["#E5E8EA","#CFD5D9"],
+    i:[["아우터","차콜 롱 울코트"],["하의","기모 슬랙스"],["신발","앵클부츠"],["포인트","머플러 · 토트백"]],
+    g:["#롱코트","#차콜","#미니멀"],p:"긴 기장이 찬바람을 막아줘요. 안에 히트텍 한 겹이면 완벽해요.",
+    a:()=>ART.coat("#3E4A54","#2A343C")+ART.legsB("#2E3740")+ART.boots(196)+ART.muffler("#8A9299","#6B747B")+ART.tote("#4C4034","#33291F")},
+   {t:"카멜 롱코트",c:"겨울에 어울리는 따뜻한 색",bg:["#F0EBE1","#E0D6C4"],
+    i:[["아우터","카멜 롱코트"],["하의","기모 슬랙스"],["신발","앵클부츠"],["포인트","머플러 · 토트백"]],
+    g:["#카멜","#롱코트","#클래식"],p:"어두운 겨울 옷차림에 카멜 색이 얼굴을 환하게 살려줘요.",
+    a:()=>ART.coat("#C9A87C","#A5865B")+ART.legsB("#2E3740")+ART.boots(196)+ART.muffler("#8A9299","#6B747B")+ART.tote("#4C4034","#33291F")},
+   {t:"미니멀 롱패딩",c:"보온이 최우선인 날",bg:["#E9ECEE","#D3D9DD"],
+    i:[["아우터","그레이 롱패딩"],["하의","기모 팬츠"],["신발","방한 부츠"],["포인트","머플러 · 토트백"]],
+    g:["#롱패딩","#보온","#심플"],p:"이 기온엔 멋보다 보온이 먼저예요. 무채색 롱패딩은 뭘 입어도 어울려요.",
+    a:()=>ART.padding("#4A5560","#333C45")+ART.legsB("#2E3740")+ART.boots(196)+ART.muffler("#D5DADD","#B0B8BD")+ART.tote("#5B6670","#414A52")}
+  ],
+  lov:[
+   {t:"크림 퍼 코트",c:"포근하게 감싸는 겨울",bg:["#FBF0F2","#F1DDE3"],
+    i:[["아우터","크림 퍼 코트"],["상의","기모 니트"],["신발","방한 부츠"],["포인트","니트 머플러 · 숄더백"]],
+    g:["#퍼코트","#크림톤","#포근"],p:"목·손목·발목을 감싸면 체감온도가 크게 올라가요.",
+    a:()=>ART.coat("#F6E7E3","#DCC2BC")+ART.legsB("#C9A9B4")+ART.boots(196)+ART.muffler("#EFC8D6","#D9A7B6")+ART.shoulder("#E8B7C6","#D094A6")},
+   {t:"핑크 롱패딩",c:"따뜻하고 사랑스럽게",bg:["#FBEFF3","#F2DEE5"],
+    i:[["아우터","연핑크 롱패딩"],["하의","기모 레깅스"],["신발","방한 부츠"],["포인트","비니 · 머플러"]],
+    g:["#롱패딩","#핑크","#겨울"],p:"롱패딩도 밝은 색을 고르면 답답해 보이지 않아요.",
+    a:()=>ART.beanie("#F4A9C0","#DE7B9B")+ART.padding("#F0D5DC","#D3AEB9")+ART.legsB("#C9A9B4")+ART.boots(196)+ART.muffler("#E58AA6","#C86A88")+ART.shoulder("#E8B7C6","#D094A6")},
+   {t:"라이트 그레이 코트",c:"은은한 보랏빛 포인트",bg:["#F4F1F6","#E7E1EC"],
+    i:[["아우터","라이트 그레이 코트"],["하의","라일락 롱스커트"],["신발","롱부츠"],["포인트","머플러 · 숄더백"]],
+    g:["#라일락","#롱코트","#페미닌"],p:"롱부츠와 긴 코트로 다리 쪽 찬바람을 최대한 막아줘요.",
+    a:()=>ART.coat("#E4E0E6","#C3BCC8")+ART.legsB("#B9A9C4")+ART.boots(196)+ART.muffler("#D8C3D8","#B79FB9")+ART.shoulder("#C8B4D2","#A692B4")}
+  ],
+  str:[
+   {t:"패딩 스트릿",c:"두툼하게, 그래도 힙하게",bg:["#DEE9E6","#C2D9D2"],
+    i:[["아우터","오버핏 숏패딩"],["하의","기모 와이드 팬츠"],["신발","청키 스니커즈"],["포인트","비니 · 크로스백"]],
+    g:["#숏패딩","#비니","#스트릿"],p:"패딩 안에 후디를 겹쳐 입으면 보온도 스타일도 같이 잡혀요.",
+    a:()=>ART.beanie("#3AA98C","#238067")+ART.padding("#2F5D52","#1D4139")+ART.legsB("#3A4650")+ART.chunky(196)+ART.cross("#238067","#17604C")},
+   {t:"다크 롱패딩",c:"극강 보온 스트릿",bg:["#E0E8EC","#C6D6DD"],
+    i:[["아우터","블랙 롱패딩"],["하의","기모 조거 팬츠"],["신발","청키 스니커즈"],["포인트","비니 · 크로스백"]],
+    g:["#롱패딩","#올블랙","#스트릿"],p:"무릎까지 덮는 기장이면 찬바람을 거의 막아줘요.",
+    a:()=>ART.beanie("#3AA98C","#238067")+ART.padding("#2A3B44","#17262D")+ART.legsB("#2E3740")+ART.chunky(196)+ART.cross("#238067","#17604C")},
+   {t:"그린 코트 레이어드",c:"색으로 존재감 주기",bg:["#E2EDE8","#C8DFD5"],
+    i:[["아우터","다크그린 롱코트"],["상의","기모 후디"],["신발","청키 스니커즈"],["포인트","비니 · 백팩"]],
+    g:["#롱코트","#레이어드","#스트릿"],p:"코트 안에 후디를 받쳐 입으면 보온도 되고 스트릿 무드도 살아요.",
+    a:()=>ART.beanie("#F2C14E","#D19B2A")+ART.coat("#2F5D52","#1D4139")+ART.legsB("#3A4650")+ART.chunky(196)+ART.backpack("#1D4139","#12312A")}
+  ]
+ }
+};
+
+let ootdMood="min", ootdW=null, ootdPick={min:0,lov:0,str:0};
+
+/* 무드별로 3벌 중 하나를 무작위 선택 (탭을 오가도 유지, 재조회 시 새로 뽑음) */
+function ootdRoll(moodKey){
+  const keys = moodKey ? [moodKey] : OOTD_MOODS.map(m=>m.key);
+  keys.forEach(function(k){
+    const band=ootdW?ootdBand(ootdW.tMax):"mild";
+    const n=(OOTD_SETS[band][k]||[]).length||1;
+    let next=Math.floor(Math.random()*n);
+    if(n>1 && next===ootdPick[k]) next=(next+1+Math.floor(Math.random()*(n-1)))%n;
+    ootdPick[k]=next;
+  });
+}
+
+function ootdEsc(s){
+  return String(s==null?"":s).replace(/[&<>"']/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+
+function ootdArt(set,w){
+  let s=set.a();
+  if(w.snow) s=ART.snowfx()+s;
+  else if(w.rain||w.popMax>=60) s=ART.rainfx()+s+ART.umbrella("#C0563F","#9A3E2C");
+  else if(w.skyMode===1&&w.tMax>=20) s=ART.sunfx()+s;
+  return s;
+}
+
+function paintOOTD(){
+  if(!ootdW) return;
+  const w=ootdW, band=ootdBand(w.tMax);
+  const list=OOTD_SETS[band][ootdMood]||[];
+  if(!list.length) return;
+  const set=list[(ootdPick[ootdMood]||0)%list.length];
+  const mood=OOTD_MOODS.find(m=>m.key===ootdMood);
+  const items=set.i.slice();
+  if(w.snow) items.push(["챙길 것","방수 부츠 · 장갑"]);
+  else if(w.rain||w.popMax>=60) items.push(["챙길 것","우산 · 방수 신발"]);
+  else if(w.popMax>=40) items.push(["챙길 것","접이식 우산"]);
+  else if(w.wsdMax>=8) items.push(["챙길 것","바람막이 한 겹"]);
+
+  const bits=[`기온 ${Math.round(w.tMin)}~${Math.round(w.tMax)}℃`];
+  if(w.snow) bits.push("눈 소식");
+  else if(w.rain) bits.push("비 소식");
+  else if(w.popMax>=40) bits.push(`강수확률 ${w.popMax}%`);
+  if(w.rehAvg>=80) bits.push(`습도 ${w.rehAvg}%`);
+  if(w.wsdMax>=8) bits.push(`바람 ${w.wsdMax.toFixed(1)}m/s`);
+
+  const emo=w.snow?"❄️":(w.rain?"🌧️":(w.skyMode===1?"☀️":(w.skyMode===3?"⛅":"☁️")));
+
+  $("ootdCard").innerHTML=`
+    <div class="ootd-card m-${ootdMood}">
+      <div class="ootd-art" style="background:linear-gradient(160deg,${set.bg[0]},${set.bg[1]})">
+        <span class="temp-badge">${Math.round(w.tMax)}°C</span>
+        <span class="wx-badge">${emo}</span>
+        <svg viewBox="0 0 200 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${ootdEsc(mood.name)} 무드 ${ootdEsc(set.t)} 코디 일러스트">${ootdArt(set,w)}</svg>
+      </div>
+      <div class="ootd-body">
+        <div class="mood-tag"><span class="mood-dot"></span><span class="mood-name">${mood.name}</span><span class="mood-en">${mood.en}</span></div>
+        <h3>${set.t}</h3>
+        <p class="concept">${set.c}</p>
+        <ul class="ootd-items">${items.map(it=>`<li><b>${it[0]}</b>${it[1]}</li>`).join("")}</ul>
+        <p class="ootd-reason">${emo} ${bits.join(" · ")} — ${set.p}</p>
+        <div class="ootd-tags">${set.g.map(t=>`<span class="tag">${t}</span>`).join("")}</div>
+      </div>
+    </div>`;
+}
+
+function renderOOTD(w,ampm){
+  ootdW=w;
+  ootdRoll();
+  const band=ootdBand(w.tMax);
+  $("ootdSub").innerHTML=`${ampm==="AM"?"오전":"오후"} 기준 <b>${BAND_LB[band]} 날씨</b>예요 — 취향에 맞는 무드를 골라보세요!`;
+  paintOOTD();
+}
+
+function kakaoMapURL(p){
+  if(p.place_url) return p.place_url;   // 카카오 로컬 장소는 상세 페이지로 바로 연결
+  return "https://map.kakao.com/link/map/"+encodeURIComponent(p.name)+","+p.lat+","+p.lon;
+}
+function renderPlaces(home, places, w){
+  const noWx = !w;
+  const pref = noWx ? "날씨정보없음"
+    : ((w.rain||w.popMax>=60||w.tMax>=33)?"실내":(w.popMax>=40||w.tMax>=30)?"혼합":"실외");
+  places.forEach(p=>{
+    let s=45+Math.max(0,30*(1-Math.min(p.dist,RADIUS_M)/RADIUS_M));
+    if(pref==="실내") s+={"실내":25,"혼합":10,"실외":-30}[p.io]||0;
+    else if(pref==="실외") s+={"실외":25,"혼합":10,"실내":-5}[p.io]||0;
+    else if(pref==="혼합") s+={"실내":15,"혼합":15,"실외":5}[p.io]||0;
+    p.score=Math.round(Math.max(0,Math.min(100,s))*10)/10;
+  });
+
+  const FOOD_CATS=new Set(["카페","음식점"]);
+  const byScore=(a,b)=>b.score-a.score||a.dist-b.dist;
+  const tourAll=places.filter(p=>!FOOD_CATS.has(p.cat)).sort(byScore);
+  const foodAll=places.filter(p=> FOOD_CATS.has(p.cat)).sort(byScore);
+  const topTour=tourAll.slice(0,4);
+  const topFood=foodAll.slice(0,4);
+
+  // 번호: 관광 1~4, 카페·음식점은 이어서 5~8. 그룹 표시(grp)도 함께 저장.
+  topTour.forEach((p,i)=>{p.n=i+1; p.grp="tour";});
+  topFood.forEach((p,i)=>{p.n=topTour.length+i+1; p.grp="food";});
+  const all=[...topTour,...topFood];
+
+  const distTxt=d=> d<1000?`${Math.round(d)}m`:`${(d/1000).toFixed(2)}km`;
+  const cardHTML=p=>`
+    <article class="place">
+      <a class="ph" href="${kakaoMapURL(p)}" target="_blank" rel="noopener" aria-label="${p.name} 카카오맵에서 보기">
+        ${CAT_EMOJI[p.cat]||"📍"}
+        ${p.img?`<img src="${p.img}" alt="${p.name}" loading="lazy" onerror="this.remove()">`:""}
+        <span class="hover-hint">🗺 카카오맵에서 보기</span>
+        <span class="num${p.grp==="food"?" food":""}">${p.n}</span>
+        <span class="cat ${p.io==="실내"?"indoor":""}">${p.cat} · ${p.io}</span>
+      </a>
+      <div class="pb">
+        <h3>${p.name}</h3>
+        <p class="meta">📍 ${distTxt(p.dist)}${p.dist<800?" · 도보 "+Math.max(1,Math.round(p.dist/70))+"분":""} · ${p.addr||"주소 정보 없음"}</p>
+        <a class="kakao-link" href="${kakaoMapURL(p)}" target="_blank" rel="noopener">🗺 카카오맵에서 보기 →</a>
+        <div class="scorebar"><i style="width:${p.score}%"></i></div>
+        <div class="score-lb"><span>추천점수</span><span>${p.score}</span></div>
+      </div>
+    </article>`;
+
+  // 관광·나들이 코너
+  $("plSub").innerHTML = tourAll.length
+    ? (noWx
+        ? `날씨 정보를 못 받아 <b>거리 기준</b>으로 정렬했어요 — 가까운 순 ${topTour.length}곳이에요. (반경 3km 내 관광·나들이 ${tourAll.length}곳)`
+        : `날씨 판단: <b>${pref} 선호</b> — 거리·날씨 적합도 합산 상위 ${topTour.length}곳이에요. (반경 3km 내 관광·나들이 ${tourAll.length}곳)`)
+    : "반경 3km 안에서 관광·문화·레포츠·공원을 찾지 못했어요. 다른 주소로 시도해 보세요.";
+  $("plCards").innerHTML = topTour.map(cardHTML).join("");
+
+  // 카페·음식점 코너
+  $("flSub").innerHTML = foodAll.length
+    ? (noWx
+        ? `가까운 카페·맛집 ${topFood.length}곳이에요. (반경 3km 내 ${foodAll.length}곳)`
+        : `비 오거나 더운 날엔 실내가 딱이죠 — 가까운 카페·맛집 ${topFood.length}곳이에요. (반경 3km 내 ${foodAll.length}곳)`)
+    : "반경 3km 안에서 카페·음식점을 찾지 못했어요. 카카오 로컬 키 설정 또는 다른 주소를 확인해 보세요.";
+  $("flCards").innerHTML = topFood.map(cardHTML).join("");
+
+  // 표: 입력 주소 + 8곳 전부 (그룹별 핀 색 구분)
+  $("coordBody").innerHTML =
+    `<tr><td><span class="pin home">🏠</span></td><td><b>입력 주소</b> · ${home.name}</td><td>—</td>
+      <td class="n">0 m</td><td class="n">—</td></tr>`
+    + all.map(p=>`<tr><td><span class="pin${p.grp==="food"?" food":""}">${p.n}</span></td>
+      <td><a href="${kakaoMapURL(p)}" target="_blank" rel="noopener" style="color:inherit">${p.name}</a></td>
+      <td>${p.cat} · ${p.io}</td>
+      <td class="n">${distTxt(p.dist)}</td><td class="n">${p.score}</td></tr>`).join("");
+
+  if(typeof L==="undefined"){
+    $("map").innerHTML='<div style="padding:24px;font-size:14px;color:#8A2F2B">지도 라이브러리(Leaflet)를 불러오지 못했어요. 네트워크 연결 또는 콘텐츠 차단 설정을 확인해 주세요. 아래 표와 카카오맵 링크는 그대로 이용할 수 있어요.</div>';
+    return;
+  }
+  try{
+  if(!map){
+    map=L.map("map",{scrollWheelZoom:false}).setView([home.lat,home.lon],13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {maxZoom:18, attribution:"&copy; OpenStreetMap contributors"}).addTo(map);
+  }
+  if(layerG) layerG.remove();
+  layerG=L.layerGroup().addTo(map);
+  const numIcon=(n,cls)=>L.divIcon({className:"",html:`<div class="marker-num${cls?" "+cls:""}">${n}</div>`,iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-14]});
+  L.marker([home.lat,home.lon],{icon:numIcon("🏠","home")}).addTo(layerG).bindPopup(`<b>입력 주소</b><br>${home.name}`);
+  const bounds=[L.latLng(home.lat,home.lon)];
+  all.forEach(p=>{
+    L.marker([p.lat,p.lon],{icon:numIcon(p.n,p.grp==="food"?"food":"")}).addTo(layerG)
+      .bindPopup(`<b>${p.n}. ${p.name}</b><br>${p.cat} · ${p.io}<br>거리 ${distTxt(p.dist)}<br><a href="${kakaoMapURL(p)}" target="_blank" rel="noopener">카카오맵에서 보기</a>`);
+    bounds.push(L.latLng(p.lat,p.lon));
+  });
+  L.circle([home.lat,home.lon],{radius:RADIUS_M,color:"#1C8CA8",weight:1.5,fillColor:"#1C8CA8",fillOpacity:.06}).addTo(layerG);
+  const bb=L.latLngBounds(bounds).pad(0.18);
+  map.invalidateSize();
+  map.fitBounds(bb,{maxZoom:15});
+  // 레이아웃 정착 후 한 번 더 보정 (반경 3km 화면 보장)
+  setTimeout(()=>{map.invalidateSize();map.fitBounds(bb,{maxZoom:15});},200);
+  }catch(mapErr){
+    console.warn("지도 렌더링 실패:", mapErr);
+    $("map").innerHTML='<div style="padding:24px;font-size:14px;color:#8A2F2B">지도를 표시하지 못했어요. 아래 표와 카카오맵 링크를 이용해 주세요.</div>';
+  }
+}
+
+function haversine(a,b,c,d){
+  const R=6371008.8, r=Math.PI/180;
+  const p1=a*r,p2=c*r,dp=(c-a)*r,dl=(d-b)*r;
+  const h=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
+}
+
+/* ---------- 메인 흐름 ---------- */
+async function run(){
+  const addr=$("addr").value.trim();
+  if(!addr){ $("addr").focus(); return; }
+  const btn=$("goBtn"); btn.disabled=true;
+  $("results").style.display="none";
+  const st=$("status");
+  const step=t=>st.innerHTML=`<div class="loading"><div class="spin"></div>${t}</div>`;
+
+  try{
+    step("주소를 위경도로 변환하는 중…");
+    const home=await geocode(addr);
+    const grid=latlonToGrid(home.lat,home.lon);
+
+    step(`기상청 단기예보 조회 중… (격자 ${grid.nx},${grid.ny})`);
+    let w=null, wxErr="";
+    try{
+      const res=await fetchVilage(grid.nx,grid.ny);
+      const d=new Date(); d.setDate(d.getDate()+selDay);
+      w=sliceWeather(res.items, ymd(d), selAmPm);
+      if(!w) wxErr=`${DAY_LB[selDay]} ${selAmPm==="AM"?"오전":"오후"} 예보가 아직 발표되지 않았어요. 다른 날짜·시간대를 선택해 보세요.`;
+    }catch(e){
+      wxErr=(e && e.message) ? e.message : String(e);
+    }
+
+    step("주변 3km 갈만한 곳 검색 중…");
+    const TYPES={"12":"관광지","14":"문화시설","28":"레포츠","39":"음식점"};
+    const lists=await Promise.all(Object.keys(TYPES).map(t=>fetchTour(home.lat,home.lon,t).then(arr=>arr.map(x=>({...x,_cat:TYPES[t]})))));
+    const seen=new Set(); const places=[];
+    for(const it of lists.flat()){
+      if(!it.contentid || seen.has(it.contentid)) continue;
+      seen.add(it.contentid);
+      const lat=+it.mapy, lon=+it.mapx;
+      if(!lat||!lon) continue;
+      const dist=it.dist?+it.dist:haversine(home.lat,home.lon,lat,lon);
+      if(dist>RADIUS_M) continue;
+      const name=(it.title||"").trim();
+      const cat = name.includes("공원") ? "공원" : it._cat;
+      places.push({name, cat, io:inferIO(it._cat,name),
+        addr:[it.addr1,it.addr2].filter(Boolean).join(" "),
+        lat, lon, dist, img:it.firstimage||it.firstimage2||""});
+    }
+
+    /* 카카오 로컬: 카페(CE7)·음식점(FD6) 추가 후 이름·거리 기준 중복 제거 */
+    try{
+      const KCATS={"CE7":"카페","FD6":"음식점"};
+      const kLists=await Promise.all(Object.keys(KCATS).map(c=>
+        fetchKakaoCategory(home.lat,home.lon,c).then(arr=>arr.map(x=>({...x,_kcat:KCATS[c]})))));
+      for(const it of kLists.flat()){
+        const lat=+it.y, lon=+it.x;
+        if(!lat||!lon) continue;
+        const dist=it.distance?+it.distance:haversine(home.lat,home.lon,lat,lon);
+        if(dist>RADIUS_M) continue;
+        const name=(it.place_name||"").trim();
+        if(!name) continue;
+        const cand={name, cat:it._kcat, io:inferIO(it._kcat,name),
+          addr:(it.road_address_name||it.address_name||""),
+          lat, lon, dist, img:"", place_url:it.place_url||""};
+        const dup=places.find(p=>isSamePlace(p,cand));
+        if(dup){ if(!dup.place_url) dup.place_url=cand.place_url; continue; }
+        places.push(cand);
+      }
+    }catch(_){ /* 카카오 조회 실패 시 공원·관광 데이터만 사용 */ }
+
+    places.sort((a,b)=>a.dist-b.dist);
+
+    st.innerHTML="";
+    $("results").style.display="block";   // 지도가 정확한 크기를 알도록 먼저 표시
+    const wxSecs=["secWeather","secActs","secOotd"];
+    if(w){
+      st.innerHTML="";
+      wxSecs.forEach(function(id){ const el=document.getElementById(id); if(el) el.style.display=""; });
+      renderWeather(w, selAmPm);
+      renderActivities(w, selAmPm);
+      renderOOTD(w, selAmPm);
+    }else{
+      // 날씨만 실패 — 날씨 기반 섹션은 감추고 장소 추천은 그대로 보여줍니다.
+      wxSecs.forEach(function(id){ const el=document.getElementById(id); if(el) el.style.display="none"; });
+      st.innerHTML=`<div class="errbox">⚠️ ${wxErr}<br>
+        <span style="opacity:.85">날씨를 못 받아 <b>날씨 요약 · 활동 추천 · OOTD</b>는 이번엔 건너뛰었어요.
+        아래 <b>주변 갈만한 곳</b>은 정상적으로 찾았습니다.</span>
+        <button type="button" class="retry-btn" id="retryBtn">🔄 날씨 다시 시도</button></div>`;
+      const rb=document.getElementById("retryBtn"); if(rb) rb.onclick=run;
+    }
+    renderPlaces(home, places, w);
+    const anchor=document.getElementById(w?"secWeather":"secPlaces");
+    if(anchor){
+      try{anchor.scrollIntoView({behavior:"smooth",block:"start"});}
+      catch(_){anchor.scrollIntoView();}
+    }
+  }catch(e){
+    let msg=e && e.message ? e.message : String(e);
+    if(e instanceof TypeError){  // fetch 자체가 막힌 경우 (미리보기 샌드박스, 네트워크 차단 등)
+      msg="외부 API 요청이 차단되었어요. 파일 미리보기(Quick Look)가 아닌 Safari/Chrome 브라우저에서 "
+         +"웹 주소(http/https)로 열었는지, 인터넷 연결이 되는지 확인해 주세요. ("+msg+")";
+    }
+    st.innerHTML=`<div class="errbox">⚠️ ${msg}
+      <button type="button" class="retry-btn" id="retryBtn2">🔄 다시 시도</button></div>`;
+    const rb2=document.getElementById("retryBtn2"); if(rb2) rb2.onclick=run;
+  }finally{
+    btn.disabled=false;
+  }
+}
+$("goBtn").onclick=run;
+document.querySelectorAll(".mtab[data-mood]").forEach(function(b){
+  b.onclick=function(){
+    ootdMood=b.getAttribute("data-mood");
+    document.querySelectorAll(".mtab[data-mood]").forEach(function(x){
+      x.classList.toggle("is-on", x===b);
+    });
+    paintOOTD();
+  };
+});
+$("ootdReroll").onclick=function(){ ootdRoll(ootdMood); paintOOTD(); };
+$("addr").addEventListener("keydown",e=>{if(e.key==="Enter"||e.keyCode===13){e.preventDefault();run();}});
+</script>
+</body>
+</html>

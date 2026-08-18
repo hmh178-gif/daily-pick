@@ -1,0 +1,9 @@
+{
+  "name": "daily-pick",
+  "version": "1.0.0",
+  "private": true,
+  "description": "오늘 하루 어디서 뭐 할까 — 날씨 기반 활동/장소 추천 (Netlify Functions 프록시)",
+  "engines": {
+    "node": ">=18"
+  }
+}
